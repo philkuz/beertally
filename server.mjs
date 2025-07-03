@@ -7,6 +7,7 @@ import connectPgSimple from "connect-pg-simple";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+console.log(process.env.DATABASE_URL);
 // PostgreSQL connection
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL || "postgresql://localhost:5432/beertally",
