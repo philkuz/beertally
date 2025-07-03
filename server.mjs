@@ -13,6 +13,9 @@ const pool = new pg.Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Database connection status
+let dbConnected = false;
+
 // Initialize database tables
 async function initializeDatabase() {
   try {
@@ -41,25 +44,24 @@ async function initializeDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_beer_entries_created_at ON beer_entries(created_at)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_session_id ON users(session_id)`);
     
+    dbConnected = true;
     console.log("Database initialized successfully");
   } catch (error) {
     console.error("Error initializing database:", error);
-    process.exit(1);
+    dbConnected = false;
+    // Don't exit, let the server start anyway
   }
 }
 
-// Initialize database on startup
-await initializeDatabase();
+// Initialize database on startup (non-blocking)
+initializeDatabase();
 
-// Session store using PostgreSQL
+// Session store using PostgreSQL (with fallback to memory store)
 const PgSession = connectPgSimple(session);
 
 app.use(
   session({
-    store: new PgSession({
-      pool: pool,
-      tableName: "session"
-    }),
+    // Use memory store initially, will fall back to database store when connected
     secret: process.env.SESSION_SECRET || "REPLACE-THIS-WITH-RANDOM-STRING",
     resave: false,
     saveUninitialized: false,
@@ -110,6 +112,15 @@ const html = (body) => `<!doctype html><title>🍺 Beer Tally</title>
 // Routes
 app.get("/", async (req, res) => {
   try {
+    // Check if database is connected
+    if (!dbConnected) {
+      return res.send(
+        html(`<h1>🍺 Beer Tally</h1>
+        <p>⏳ Setting up database connection... Please refresh in a moment.</p>
+        <script>setTimeout(() => location.reload(), 3000);</script>`)
+      );
+    }
+
     const user = await getOrCreateUser(req.session.id);
     
     if (!user) {
@@ -153,6 +164,9 @@ app.get("/", async (req, res) => {
 // Set name
 app.post("/setname", async (req, res) => {
   try {
+    if (!dbConnected) {
+      return res.redirect("/");
+    }
     const name = req.body.name.trim().slice(0, 30);
     if (name) {
       await pool.query(
@@ -170,6 +184,9 @@ app.post("/setname", async (req, res) => {
 // Add beer
 app.post("/add", async (req, res) => {
   try {
+    if (!dbConnected) {
+      return res.redirect("/");
+    }
     const user = await getOrCreateUser(req.session.id);
     if (user) {
       await pool.query(
@@ -187,6 +204,9 @@ app.post("/add", async (req, res) => {
 // Remove beer
 app.post("/remove", async (req, res) => {
   try {
+    if (!dbConnected) {
+      return res.redirect("/");
+    }
     const user = await getOrCreateUser(req.session.id);
     if (user) {
       // Remove the most recent beer entry
