@@ -104,6 +104,13 @@ async function getLeaderboard() {
   return result.rows;
 }
 
+async function getTotalBeerCount() {
+  const result = await pool.query(
+    "SELECT COUNT(*) as total FROM beer_entries"
+  );
+  return parseInt(result.rows[0].total);
+}
+
 // HTML template
 const html = (body) => `<!doctype html><title>🍺 Beer Tally</title>
 <style>
@@ -120,6 +127,9 @@ app.get("/", async (req, res) => {
     if (!dbConnected) {
       return res.send(
         html(`<h1>🍺 Beer Tally</h1>
+        <div style="background:#e8f4f8;padding:1rem;border-radius:8px;margin-bottom:1rem;text-align:center;">
+          <h2 style="margin:0;color:#2c5282;">Total Beers Consumed: <span style="font-size:1.5em;color:#d53f8c;">0</span></h2>
+        </div>
         <p>⏳ Setting up database connection... Please refresh in a moment.</p>
         <script>setTimeout(() => location.reload(), 3000);</script>`)
       );
@@ -138,6 +148,7 @@ app.get("/", async (req, res) => {
     }
 
     const beerCount = await getBeerCount(user.id);
+    const totalBeerCount = await getTotalBeerCount();
     const leaderboard = await getLeaderboard();
     
     const rankRows = leaderboard
@@ -151,6 +162,9 @@ app.get("/", async (req, res) => {
 
     res.send(
       html(`<h1>🍺 Beer Tally</h1>
+      <div style="background:#e8f4f8;padding:1rem;border-radius:8px;margin-bottom:1rem;text-align:center;">
+        <h2 style="margin:0;color:#2c5282;">Total Beers Consumed: <span style="font-size:1.5em;color:#d53f8c;">${totalBeerCount}</span></h2>
+      </div>
       <p>Hi, <strong>${escape(user.name)}</strong>! You've had <strong>${
         beerCount
       }</strong> beer${beerCount === 1 ? "" : "s"}.</p>
