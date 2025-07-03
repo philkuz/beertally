@@ -112,13 +112,278 @@ async function getTotalBeerCount() {
 }
 
 // HTML template
-const html = (body) => `<!doctype html><title>🍺 Beer Tally</title>
-<style>
- body{font-family:sans-serif;margin:2rem;line-height:1.4}
- h1{margin-top:0} table{border-collapse:collapse}
- td,th{padding:.4rem .8rem;border:1px solid #ccc;text-align:left}
- button{font-size:1.2rem;padding:.4rem 1.2rem}
-</style>${body}`;
+const html = (body) => `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍺 Beer Tally</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      line-height: 1.6;
+      background-color: #f7fafc;
+      color: #2d3748;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    
+    .header {
+      padding: 1.5rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 700;
+    }
+    
+    .content {
+      padding: 1.5rem;
+    }
+    
+    .total-counter {
+      background: linear-gradient(135deg, #e8f4f8 0%, #d4edda 100%);
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      border: 2px solid #bee5eb;
+    }
+    
+    .total-counter h2 {
+      margin: 0;
+      color: #2c5282;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    
+    .total-number {
+      font-size: 3rem;
+      font-weight: 800;
+      color: #d53f8c;
+      display: block;
+      margin-top: 0.5rem;
+    }
+    
+    .user-info {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    
+    .user-info p {
+      margin: 0;
+      font-size: 1.1rem;
+      color: #495057;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin: 1rem 0;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 120px;
+      min-height: 48px;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .remove-btn {
+      background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+    }
+    
+    .submit-btn {
+      background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+    }
+    
+    .form-section {
+      text-align: center;
+      padding: 2rem;
+    }
+    
+    .form-section h1 {
+      color: #2d3748;
+      margin-bottom: 1.5rem;
+      font-size: 1.8rem;
+    }
+    
+    input[type="text"] {
+      padding: 0.75rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 1rem;
+    }
+    
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #4299e1;
+      box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    }
+    
+    .leaderboard {
+      margin-top: 2rem;
+    }
+    
+    .leaderboard h2 {
+      color: #2d3748;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    th {
+      background: #f7fafc;
+      font-weight: 600;
+      color: #4a5568;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    tr:hover {
+      background: #f8f9fa;
+    }
+    
+    .current-user {
+      background: #e6fffa !important;
+      font-weight: 600;
+    }
+    
+    .current-user:hover {
+      background: #b2f5ea !important;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #718096;
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      body {
+        padding: 0.5rem;
+      }
+      
+      .header h1 {
+        font-size: 1.5rem;
+      }
+      
+      .total-number {
+        font-size: 2.5rem;
+      }
+      
+      .content {
+        padding: 1rem;
+      }
+      
+      .button-group {
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      
+      button {
+        width: 100%;
+        min-height: 52px;
+        font-size: 1rem;
+      }
+      
+      th, td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+      }
+      
+      .total-counter {
+        padding: 1rem;
+      }
+      
+      .total-counter h2 {
+        font-size: 1.1rem;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .header h1 {
+        font-size: 1.3rem;
+      }
+      
+      .total-number {
+        font-size: 2rem;
+      }
+      
+      th, td {
+        padding: 0.4rem;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    ${body}
+  </div>
+</body>
+</html>`;
 
 // Routes
 app.get("/", async (req, res) => {
@@ -126,11 +391,18 @@ app.get("/", async (req, res) => {
     // Check if database is connected
     if (!dbConnected) {
       return res.send(
-        html(`<h1>🍺 Beer Tally</h1>
-        <div style="background:#e8f4f8;padding:1rem;border-radius:8px;margin-bottom:1rem;text-align:center;">
-          <h2 style="margin:0;color:#2c5282;">Total Beers Consumed: <span style="font-size:1.5em;color:#d53f8c;">0</span></h2>
+        html(`<div class="header">
+          <h1>🍺 Beer Tally</h1>
         </div>
-        <p>⏳ Setting up database connection... Please refresh in a moment.</p>
+        <div class="content">
+          <div class="total-counter">
+            <h2>Total Beers Consumed</h2>
+            <span class="total-number">0</span>
+          </div>
+          <div class="loading">
+            <p>⏳ Setting up database connection... Please refresh in a moment.</p>
+          </div>
+        </div>
         <script>setTimeout(() => location.reload(), 3000);</script>`)
       );
     }
@@ -139,11 +411,19 @@ app.get("/", async (req, res) => {
     
     if (!user) {
       return res.send(
-        html(`<h1>Your name?</h1>
-        <form method="post" action="/setname">
-          <input name="name" required autofocus>
-          <button>OK</button>
-        </form>`)
+        html(`<div class="header">
+          <h1>🍺 Beer Tally</h1>
+        </div>
+        <div class="content">
+          <div class="form-section">
+            <h1>What's your name?</h1>
+            <form method="post" action="/setname">
+              <input type="text" name="name" placeholder="Enter your name" required autofocus>
+              <br>
+              <button type="submit" class="submit-btn">Let's Start! 🚀</button>
+            </form>
+          </div>
+        </div>`)
       );
     }
 
@@ -155,23 +435,40 @@ app.get("/", async (req, res) => {
       .map((d, i) => {
         const isCurrentUser = d.name === user.name;
         return `<tr${
-          isCurrentUser ? ' style="font-weight:bold;background:#f5f5f5"' : ""
+          isCurrentUser ? ' class="current-user"' : ""
         }><td>${i + 1}</td><td>${escape(d.name)}</td><td>${d.count}</td></tr>`;
       })
       .join("");
 
     res.send(
-      html(`<h1>🍺 Beer Tally</h1>
-      <div style="background:#e8f4f8;padding:1rem;border-radius:8px;margin-bottom:1rem;text-align:center;">
-        <h2 style="margin:0;color:#2c5282;">Total Beers Consumed: <span style="font-size:1.5em;color:#d53f8c;">${totalBeerCount}</span></h2>
+      html(`<div class="header">
+        <h1>🍺 Beer Tally</h1>
       </div>
-      <p>Hi, <strong>${escape(user.name)}</strong>! You've had <strong>${
+      <div class="content">
+        <div class="total-counter">
+          <h2>Total Beers Consumed</h2>
+          <span class="total-number">${totalBeerCount}</span>
+        </div>
+        <div class="user-info">
+          <p>Hi, <strong>${escape(user.name)}</strong>! You've had <strong>${
         beerCount
       }</strong> beer${beerCount === 1 ? "" : "s"}.</p>
-      <form method="post" action="/add" style="display:inline"><button>+1 Beer</button></form>
-      <form method="post" action="/remove" style="display:inline;margin-left:10px"><button>-1 Beer</button></form>
-      <h2>Leaderboard</h2>
-      <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${rankRows}</table>`)
+        </div>
+        <div class="button-group">
+          <form method="post" action="/add" style="display:inline">
+            <button type="submit">+1 Beer 🍺</button>
+          </form>
+          <form method="post" action="/remove" style="display:inline">
+            <button type="submit" class="remove-btn">-1 Beer ❌</button>
+          </form>
+        </div>
+        <div class="leaderboard">
+          <h2>🏆 Leaderboard</h2>
+          <div class="table-container">
+            <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${rankRows}</table>
+          </div>
+        </div>
+      </div>`)
     );
   } catch (error) {
     console.error("Error in GET /:", error);
