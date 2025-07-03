@@ -7,7 +7,6 @@ import connectPgSimple from "connect-pg-simple";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-console.log(process.env.DATABASE_URL);
 // PostgreSQL connection
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL || "postgresql://localhost:5432/beertally",
@@ -57,15 +56,19 @@ async function initializeDatabase() {
 // Initialize database on startup (non-blocking)
 initializeDatabase();
 
-// Session store using PostgreSQL (with fallback to memory store)
+// Session store using PostgreSQL
 const PgSession = connectPgSimple(session);
 
 app.use(
   session({
-    // Use memory store initially, will fall back to database store when connected
+    store: new PgSession({
+      pool: pool,
+      tableName: "session",
+      createTableIfMissing: true
+    }),
     secret: process.env.SESSION_SECRET || "REPLACE-THIS-WITH-RANDOM-STRING",
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 days
   })
 );
