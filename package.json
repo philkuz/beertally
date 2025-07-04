@@ -1,7 +1,7 @@
 {
-  "name": "beertally",
+  "name": "room-system",
   "version": "1.0.0",
-  "description": "A beer tally app with PostgreSQL persistence",
+  "description": "A room system where users can join using short room IDs",
   "main": "server.mjs",
   "type": "module",
   "scripts": {
@@ -13,9 +13,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "connect-pg-simple": "^9.0.1",
     "express": "^5.1.0",
     "express-session": "^1.18.1",
     "pg": "^8.11.3",
-    "connect-pg-simple": "^9.0.1"
+    "socket.io": "^4.8.1"
   }
 }

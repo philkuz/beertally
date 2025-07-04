@@ -1,4 +1,4 @@
--- Database initialization for Beer Tally app
+-- Room System Database Initialization
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
@@ -8,15 +8,42 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create beer_entries table
-CREATE TABLE IF NOT EXISTS beer_entries (
+-- Create rooms table
+CREATE TABLE IF NOT EXISTS rooms (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
+    room_code VARCHAR(6) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    creator_id INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Create room_messages table
+CREATE TABLE IF NOT EXISTS room_messages (
+    id SERIAL PRIMARY KEY,
+    room_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Create index for better performance
-CREATE INDEX IF NOT EXISTS idx_beer_entries_user_id ON beer_entries(user_id);
-CREATE INDEX IF NOT EXISTS idx_beer_entries_created_at ON beer_entries(created_at);
+-- Create room_participants table
+CREATE TABLE IF NOT EXISTS room_participants (
+    id SERIAL PRIMARY KEY,
+    room_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(room_id, user_id)
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_rooms_room_code ON rooms(room_code);
+CREATE INDEX IF NOT EXISTS idx_room_messages_room_id ON room_messages(room_id);
+CREATE INDEX IF NOT EXISTS idx_room_participants_room_id ON room_participants(room_id);
 CREATE INDEX IF NOT EXISTS idx_users_session_id ON users(session_id); 
