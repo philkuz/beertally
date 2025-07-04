@@ -863,6 +863,7 @@ app.get("/game", (req, res) => {
       gameRunning = true;
       gameStarted = false;
       gameOverElement.style.display = 'none';
+      gameLoop(); // Restart the game loop
     }
 
     // Event listeners
