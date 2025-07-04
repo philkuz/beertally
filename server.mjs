@@ -25,6 +25,7 @@ async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         session_id VARCHAR(255) UNIQUE NOT NULL,
         name VARCHAR(30) NOT NULL,
+        user_type VARCHAR(20) DEFAULT 'participant' NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -43,6 +44,14 @@ async function initializeDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_beer_entries_user_id ON beer_entries(user_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_beer_entries_created_at ON beer_entries(created_at)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_session_id ON users(session_id)`);
+    
+    // Add user_type column if it doesn't exist (migration)
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) DEFAULT 'participant' NOT NULL`);
+    } catch (error) {
+      // Column might already exist, continue
+      console.log("user_type column already exists or error adding it:", error.message);
+    }
     
     dbConnected = true;
     console.log("Database initialized successfully");
@@ -79,7 +88,7 @@ app.use(express.urlencoded({ extended: false }));
 // Helper functions
 async function getOrCreateUser(sessionId) {
   const result = await pool.query(
-    "SELECT id, name FROM users WHERE session_id = $1",
+    "SELECT id, name, user_type FROM users WHERE session_id = $1",
     [sessionId]
   );
   return result.rows[0] || null;
@@ -94,14 +103,28 @@ async function getBeerCount(userId) {
 }
 
 async function getLeaderboard() {
-  const result = await pool.query(`
+  const participants = await pool.query(`
     SELECT u.name, COUNT(be.id) as count
     FROM users u
     LEFT JOIN beer_entries be ON u.id = be.user_id
+    WHERE u.user_type = 'participant'
     GROUP BY u.id, u.name
     ORDER BY count DESC
   `);
-  return result.rows;
+  
+  const observers = await pool.query(`
+    SELECT u.name, COUNT(be.id) as count
+    FROM users u
+    LEFT JOIN beer_entries be ON u.id = be.user_id
+    WHERE u.user_type = 'observer'
+    GROUP BY u.id, u.name
+    ORDER BY count DESC
+  `);
+  
+  return {
+    participants: participants.rows,
+    observers: observers.rows
+  };
 }
 
 async function getTotalBeerCount() {
@@ -434,6 +457,20 @@ app.get("/", async (req, res) => {
             <form method="post" action="/setname">
               <input type="text" name="name" placeholder="Enter your name" required autofocus>
               <br>
+              <div style="margin: 1rem 0;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Role:</label>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="radio" name="user_type" value="participant" checked>
+                    <span>🍺 Participant</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="radio" name="user_type" value="observer">
+                    <span>👀 Observer</span>
+                  </label>
+                </div>
+                <p style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">Observers can track beers but appear in a separate section</p>
+              </div>
               <button type="submit" class="submit-btn">Let's Start! 🚀</button>
             </form>
           </div>
@@ -445,7 +482,16 @@ app.get("/", async (req, res) => {
     const totalBeerCount = await getTotalBeerCount();
     const leaderboard = await getLeaderboard();
     
-    const rankRows = leaderboard
+    const participantRows = leaderboard.participants
+      .map((d, i) => {
+        const isCurrentUser = d.name === user.name;
+        return `<tr${
+          isCurrentUser ? ' class="current-user"' : ""
+        }><td>${i + 1}</td><td>${escape(d.name)}</td><td>${d.count}</td></tr>`;
+      })
+      .join("");
+      
+    const observerRows = leaderboard.observers
       .map((d, i) => {
         const isCurrentUser = d.name === user.name;
         return `<tr${
@@ -464,7 +510,7 @@ app.get("/", async (req, res) => {
           <span class="total-number">${totalBeerCount}</span>
         </div>
         <div class="user-info">
-          <p>Hi, <strong>${escape(user.name)}</strong>! You've had <strong>${
+          <p>Hi, <strong>${escape(user.name)}</strong>${user.user_type === 'observer' ? ' 👀' : ' 🍺'}! You've had <strong>${
         beerCount
       }</strong> beer${beerCount === 1 ? "" : "s"}.</p>
         </div>
@@ -477,10 +523,15 @@ app.get("/", async (req, res) => {
           </form>
         </div>
         <div class="leaderboard">
-          <h2>🏆 Leaderboard</h2>
+          <h2>🏆 Participants</h2>
           <div class="table-container">
-            <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${rankRows}</table>
+            <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${participantRows}</table>
           </div>
+          ${observerRows.length > 0 ? `
+          <h2 style="margin-top: 2rem;">👀 Observers</h2>
+          <div class="table-container">
+            <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${observerRows}</table>
+          </div>` : ''}
         </div>
       </div>`)
     );
@@ -497,10 +548,12 @@ app.post("/setname", async (req, res) => {
       return res.redirect("/");
     }
     const name = req.body.name.trim().slice(0, 30);
+    const userType = req.body.user_type === 'observer' ? 'observer' : 'participant';
+    
     if (name) {
       await pool.query(
-        "INSERT INTO users (session_id, name) VALUES ($1, $2) ON CONFLICT (session_id) DO UPDATE SET name = $2",
-        [req.session.id, name]
+        "INSERT INTO users (session_id, name, user_type) VALUES ($1, $2, $3) ON CONFLICT (session_id) DO UPDATE SET name = $2, user_type = $3",
+        [req.session.id, name, userType]
       );
     }
     res.redirect("/");
