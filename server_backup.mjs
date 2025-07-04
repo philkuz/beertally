@@ -288,38 +288,103 @@ async function getUserRoom(userId) {
   return result.rows[0] || null;
 }
 
-async function saveFlappyBirdScore(userId, score) {
-  await pool.query(
-    "INSERT INTO flappy_bird_scores (user_id, score) VALUES ($1, $2)",
-    [userId, score]
+async function createRoom(userId, roomName) {
+  let roomCode;
+  let attempts = 0;
+  
+  // Generate unique room code
+  do {
+    roomCode = generateRoomCode();
+    attempts++;
+    if (attempts > 10) throw new Error("Failed to generate unique room code");
+  } while (await pool.query("SELECT id FROM rooms WHERE room_code = $1", [roomCode]).then(r => r.rows.length > 0));
+  
+  const result = await pool.query(
+    "INSERT INTO rooms (room_code, name, creator_id) VALUES ($1, $2, $3) RETURNING *",
+    [roomCode, roomName, userId]
   );
+  
+  // Add creator as participant
+  await pool.query(
+    "INSERT INTO room_participants (room_id, user_id) VALUES ($1, $2)",
+    [result.rows[0].id, userId]
+  );
+  
+  return result.rows[0];
 }
 
-async function getFlappyBirdLeaderboard() {
+async function joinRoom(userId, roomCode) {
+  const roomResult = await pool.query(
+    "SELECT * FROM rooms WHERE room_code = $1 AND is_active = true",
+    [roomCode.toUpperCase()]
+  );
+  
+  if (roomResult.rows.length === 0) {
+    throw new Error("Room not found");
+  }
+  
+  const room = roomResult.rows[0];
+  
+  // Check if user is already in room
+  const existingParticipant = await pool.query(
+    "SELECT * FROM room_participants WHERE room_id = $1 AND user_id = $2",
+    [room.id, userId]
+  );
+  
+  if (existingParticipant.rows.length === 0) {
+    await pool.query(
+      "INSERT INTO room_participants (room_id, user_id) VALUES ($1, $2)",
+      [room.id, userId]
+    );
+  } else {
+    // Reactivate participant if they were inactive
+    await pool.query(
+      "UPDATE room_participants SET is_active = true WHERE room_id = $1 AND user_id = $2",
+      [room.id, userId]
+    );
+  }
+  
+  return room;
+}
+
+async function getRoomMessages(roomId, limit = 50) {
   const result = await pool.query(`
-    SELECT u.name, MAX(fbs.score) as best_score, COUNT(fbs.id) as games_played
-    FROM users u
-    JOIN flappy_bird_scores fbs ON u.id = fbs.user_id
-    GROUP BY u.id, u.name
-    ORDER BY best_score DESC
-    LIMIT 10
-  `);
+    SELECT rm.*, u.name as user_name 
+    FROM room_messages rm
+    JOIN users u ON rm.user_id = u.id
+    WHERE rm.room_id = $1
+    ORDER BY rm.created_at DESC
+    LIMIT $2
+  `, [roomId, limit]);
+  
+  return result.rows.reverse();
+}
+
+async function getRoomParticipants(roomId) {
+  const result = await pool.query(`
+    SELECT u.id, u.name
+    FROM room_participants rp
+    JOIN users u ON rp.user_id = u.id
+    WHERE rp.room_id = $1 AND rp.is_active = true
+    ORDER BY rp.joined_at ASC
+  `, [roomId]);
+  
   return result.rows;
 }
 
-async function getUserBestFlappyScore(userId) {
+async function saveMessage(roomId, userId, message) {
   const result = await pool.query(
-    "SELECT MAX(score) as best_score FROM flappy_bird_scores WHERE user_id = $1",
-    [userId]
+    "INSERT INTO room_messages (room_id, user_id, message) VALUES ($1, $2, $3) RETURNING *",
+    [roomId, userId, message]
   );
-  return result.rows[0]?.best_score || 0;
+  
+  const user = await pool.query("SELECT name FROM users WHERE id = $1", [userId]);
+  
+  return {
+    ...result.rows[0],
+    user_name: user.rows[0].name
+  };
 }
-
-
-
-
-
-
 
 // HTML template
 const html = (body) => `<!doctype html>
@@ -327,7 +392,7 @@ const html = (body) => `<!doctype html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>� Beer Tally</title>
+  <title>🏠 Room System</title>
   <style>
     * {
       box-sizing: border-box;
