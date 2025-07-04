@@ -40,10 +40,23 @@ async function initializeDatabase() {
       )
     `);
     
+    // Create flappy_bird_scores table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS flappy_bird_scores (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        score INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    
     // Create indexes
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_beer_entries_user_id ON beer_entries(user_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_beer_entries_created_at ON beer_entries(created_at)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_session_id ON users(session_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_flappy_bird_scores_user_id ON flappy_bird_scores(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_flappy_bird_scores_score ON flappy_bird_scores(score DESC)`);
     
     // Add user_type column if it doesn't exist (migration)
     try {
@@ -84,6 +97,7 @@ app.use(
 
 // Middleware
 app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
 
 // Helper functions
 async function getOrCreateUser(sessionId) {
@@ -135,6 +149,33 @@ async function getTotalBeerCount() {
     WHERE u.user_type = 'participant'
   `);
   return parseInt(result.rows[0].total);
+}
+
+async function saveFlappyBirdScore(userId, score) {
+  await pool.query(
+    "INSERT INTO flappy_bird_scores (user_id, score) VALUES ($1, $2)",
+    [userId, score]
+  );
+}
+
+async function getFlappyBirdLeaderboard() {
+  const result = await pool.query(`
+    SELECT u.name, MAX(fbs.score) as best_score, COUNT(fbs.id) as games_played
+    FROM users u
+    JOIN flappy_bird_scores fbs ON u.id = fbs.user_id
+    GROUP BY u.id, u.name
+    ORDER BY best_score DESC
+    LIMIT 10
+  `);
+  return result.rows;
+}
+
+async function getUserBestFlappyScore(userId) {
+  const result = await pool.query(
+    "SELECT MAX(score) as best_score FROM flappy_bird_scores WHERE user_id = $1",
+    [userId]
+  );
+  return result.rows[0]?.best_score || 0;
 }
 
 // HTML template
@@ -525,6 +566,7 @@ app.get("/", async (req, res) => {
             <button type="submit" class="remove-btn">undo</button>
           </form>
           <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Flappy Bird!</a>
+          <a href="/flappy-leaderboard" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#9B59B6; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🏆 Bird Scores</a>
         </div>
         <div class="leaderboard">
           <h2>🏆 Participants</h2>
@@ -605,6 +647,38 @@ app.post("/remove", async (req, res) => {
   } catch (error) {
     console.error("Error in POST /remove:", error);
     res.status(500).send("Server error");
+  }
+});
+
+// Submit Flappy Bird score
+app.post("/submit-score", async (req, res) => {
+  try {
+    if (!dbConnected) {
+      return res.status(500).json({ error: "Database not connected" });
+    }
+    
+    const user = await getOrCreateUser(req.session.id);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    
+    const { score } = req.body;
+    if (typeof score !== 'number' || score < 0) {
+      return res.status(400).json({ error: "Invalid score" });
+    }
+    
+    await saveFlappyBirdScore(user.id, score);
+    const bestScore = await getUserBestFlappyScore(user.id);
+    
+    res.json({ 
+      success: true, 
+      score,
+      bestScore,
+      isNewBest: score === bestScore
+    });
+  } catch (error) {
+    console.error("Error in POST /submit-score:", error);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -701,6 +775,7 @@ app.get("/game", (req, res) => {
     <div class="controls">
       <p>Click or Press SPACE to Flap!</p>
       <a href="/" class="home-btn">🍺 Back to Beer Tally</a>
+      <a href="/flappy-leaderboard" class="home-btn" style="background: #9B59B6; margin-left: 10px;">🏆 Leaderboard</a>
     </div>
   </div>
 
@@ -846,6 +921,38 @@ app.get("/game", (req, res) => {
       gameRunning = false;
       finalScoreElement.textContent = score;
       gameOverElement.style.display = 'block';
+      
+      // Submit score to server
+      if (score > 0) {
+        submitScore(score);
+      }
+    }
+    
+    async function submitScore(gameScore) {
+      try {
+        const response = await fetch('/submit-score', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ score: gameScore })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.isNewBest) {
+            // Show new best score notification
+            const gameOverDiv = document.getElementById('gameOver');
+            const newBestMsg = document.createElement('p');
+            newBestMsg.style.color = '#FFD700';
+            newBestMsg.style.fontWeight = 'bold';
+            newBestMsg.textContent = '🎉 New Best Score! 🎉';
+            gameOverDiv.insertBefore(newBestMsg, gameOverDiv.querySelector('button'));
+          }
+        }
+      } catch (error) {
+        console.error('Error submitting score:', error);
+      }
     }
 
     function restartGame() {
@@ -863,6 +970,14 @@ app.get("/game", (req, res) => {
       gameRunning = true;
       gameStarted = false;
       gameOverElement.style.display = 'none';
+      
+      // Clean up any new best score notifications
+      const gameOverDiv = document.getElementById('gameOver');
+      const newBestMsg = gameOverDiv.querySelector('p[style*="color: rgb(255, 215, 0)"]');
+      if (newBestMsg) {
+        newBestMsg.remove();
+      }
+      
       gameLoop(); // Restart the game loop
     }
 
@@ -882,6 +997,66 @@ app.get("/game", (req, res) => {
 </html>`;
 
   res.send(gameHtml);
+});
+
+// Flappy Bird Leaderboard Route
+app.get("/flappy-leaderboard", async (req, res) => {
+  try {
+    if (!dbConnected) {
+      return res.send(
+        html(`<div class="header">
+          <h1>🐦 Flappy Bird Leaderboard</h1>
+        </div>
+        <div class="content">
+          <div class="loading">
+            <p>⏳ Setting up database connection... Please refresh in a moment.</p>
+          </div>
+        </div>
+        <script>setTimeout(() => location.reload(), 3000);</script>`)
+      );
+    }
+
+    const leaderboard = await getFlappyBirdLeaderboard();
+    const user = await getOrCreateUser(req.session.id);
+    
+    const leaderboardRows = leaderboard
+      .map((player, i) => {
+        const isCurrentUser = user && player.name === user.name;
+        return `<tr${
+          isCurrentUser ? ' class="current-user"' : ""
+        }><td>${i + 1}</td><td>${escape(player.name)}</td><td>${player.best_score}</td><td>${player.games_played}</td></tr>`;
+      })
+      .join("");
+
+    const currentUserBest = user ? await getUserBestFlappyScore(user.id) : 0;
+
+    res.send(
+      html(`<div class="header">
+        <h1>🐦 Flappy Bird Leaderboard</h1>
+      </div>
+      <div class="content">
+        ${user ? `<div class="user-info">
+          <p>Hi, <strong>${escape(user.name)}</strong>! Your best score: <strong>${currentUserBest}</strong></p>
+        </div>` : ''}
+        <div class="button-group">
+          <a href="/" class="home-btn" style="display:inline-block; padding:10px 20px; background:#4CAF50; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🍺 Back to Beer Tally</a>
+          <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Again!</a>
+        </div>
+        <div class="leaderboard">
+          <h2>🏆 Top Scores</h2>
+          <div class="table-container">
+            <table>
+              <tr><th>#</th><th>Player</th><th>Best Score</th><th>Games Played</th></tr>
+              ${leaderboardRows.length > 0 ? leaderboardRows : '<tr><td colspan="4" style="text-align: center; color: #666;">No scores yet! Be the first to play!</td></tr>'}
+            </table>
+          </div>
+        </div>
+      </div>`)
+    );
+  } catch (error) {
+    console.error("Error in GET /flappy-leaderboard:", error);
+    res.status(500).send("Server error");
+  }
 });
 
 // Helper function
