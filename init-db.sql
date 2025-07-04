@@ -72,11 +72,11 @@ CREATE INDEX IF NOT EXISTS idx_users_room_id ON users(room_id);
 CREATE INDEX IF NOT EXISTS idx_room_messages_room_id ON room_messages(room_id);
 CREATE INDEX IF NOT EXISTS idx_room_participants_room_id ON room_participants(room_id);
 
--- Insert default room for existing users
+-- Insert Roy's Bachelor Party room for existing users
 INSERT INTO rooms (room_code, name, creator_id) 
-SELECT 'BEER01', 'Default Beer Room', 1
+SELECT 'BEER01', 'Roy''s Bachelor Party', 1
 WHERE NOT EXISTS (SELECT 1 FROM rooms WHERE room_code = 'BEER01');
 
--- Migrate existing users to default room
+-- Migrate existing users to Roy's Bachelor Party room
 UPDATE users SET room_id = (SELECT id FROM rooms WHERE room_code = 'BEER01') 
 WHERE room_id IS NULL; 

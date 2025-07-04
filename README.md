@@ -24,7 +24,7 @@ A beer tracking app with PostgreSQL persistence and room support, designed for d
 ## Room Functionality
 
 ### Using Rooms
-- All existing users are automatically assigned to the default room "BEER01"
+- All existing users are automatically assigned to the default room "BEER01" (Roy's Bachelor Party)
 - Users can create new rooms or join existing ones using short codes
 - Each room has its own leaderboard and beer tallies
 - Room codes are 6 characters (letters/numbers, e.g., ABC123)
@@ -72,7 +72,7 @@ A beer tracking app with PostgreSQL persistence and room support, designed for d
 5. **Deploy:**
    - Railway will automatically build and deploy your app
    - The database tables will be created automatically on first run
-   - Existing users will be migrated to the default room
+   - Existing users will be migrated to Roy's Bachelor Party room
 
 ## Environment Variables
 
@@ -92,7 +92,7 @@ A beer tracking app with PostgreSQL persistence and room support, designed for d
 
 ## Migration Notes
 
-- Existing users are automatically assigned to room "BEER01" on first startup
+- Existing users are automatically assigned to room "BEER01" (Roy's Bachelor Party) on first startup
 - All existing beer entries remain intact and associated with users
 - No data loss during the room migration process
 

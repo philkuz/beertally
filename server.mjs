@@ -111,10 +111,10 @@ async function createDefaultRoomAndMigrate() {
       // Create default room
       const defaultRoom = await pool.query(
         "INSERT INTO rooms (room_code, name, creator_id) VALUES ($1, $2, (SELECT id FROM users LIMIT 1)) RETURNING id",
-        ['BEER01', 'Default Beer Room']
+        ['BEER01', "Roy's Bachelor Party"]
       );
       defaultRoomId = defaultRoom.rows[0]?.id;
-      console.log("Created default room BEER01");
+      console.log("Created default room BEER01 - Roy's Bachelor Party");
     } else {
       defaultRoomId = existingRoom.rows[0].id;
     }
@@ -634,99 +634,8 @@ const html = (body) => `<!doctype html>
 </head>
 <body>
   ${body}
-  <script src="/socket.io/socket.io.js"></script>
 </body>
 </html>`;
-
-// Socket.IO middleware to share session
-io.use((socket, next) => {
-  sessionMiddleware(socket.request, {}, next);
-});
-
-// Socket.IO connection handling
-io.on('connection', async (socket) => {
-  const session = socket.request.session;
-  
-  if (!session.userId) {
-    socket.disconnect();
-    return;
-  }
-  
-  const user = await getOrCreateUser(session.id);
-  if (!user) {
-    socket.disconnect();
-    return;
-  }
-  
-  socket.userId = user.id;
-  socket.userName = user.name;
-  
-  socket.on('join-room', async (roomCode) => {
-    try {
-      const room = await joinRoom(user.id, roomCode);
-      socket.roomId = room.id;
-      socket.roomCode = room.room_code;
-      
-      socket.join(room.room_code);
-      
-      // Send room data
-      const messages = await getRoomMessages(room.id);
-      const participants = await getRoomParticipants(room.id);
-      
-      socket.emit('room-joined', {
-        room: room,
-        messages: messages,
-        participants: participants
-      });
-      
-      // Notify others
-      socket.to(room.room_code).emit('user-joined', {
-        id: user.id,
-        name: user.name
-      });
-      
-      // Update participants list for all users
-      const updatedParticipants = await getRoomParticipants(room.id);
-      io.to(room.room_code).emit('participants-updated', updatedParticipants);
-      
-    } catch (error) {
-      socket.emit('error', error.message);
-    }
-  });
-  
-  socket.on('send-message', async (messageData) => {
-    if (!socket.roomId) return;
-    
-    try {
-      const savedMessage = await saveMessage(socket.roomId, user.id, messageData.message);
-      
-      io.to(socket.roomCode).emit('new-message', {
-        id: savedMessage.id,
-        message: savedMessage.message,
-        user_name: savedMessage.user_name,
-        user_id: savedMessage.user_id,
-        created_at: savedMessage.created_at
-      });
-      
-    } catch (error) {
-      socket.emit('error', 'Failed to send message');
-    }
-  });
-  
-  socket.on('disconnect', async () => {
-    if (socket.roomCode) {
-      socket.to(socket.roomCode).emit('user-left', {
-        id: user.id,
-        name: user.name
-      });
-      
-      if (socket.roomId) {
-        const updatedParticipants = await getRoomParticipants(socket.roomId);
-        socket.to(socket.roomCode).emit('participants-updated', updatedParticipants);
-      }
-    }
-  });
-});
 
 // Routes
 app.get("/", async (req, res) => {
@@ -1105,8 +1014,8 @@ app.get("/logout", (req, res) => {
 });
 
 // Start server
-server.listen(PORT, () => {
-  console.log(`Room System server running on port ${PORT}`);
-  console.log(`Visit http://localhost:${PORT} to get started`);
+app.listen(PORT, () => {
+  console.log(`🍻 Beer Tally server running on port ${PORT}`);
+  console.log(`🔗 Open http://localhost:${PORT}`);
 });
 

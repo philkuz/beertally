@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS rooms (
 
 -- Step 3: Create default room for existing users
 INSERT INTO rooms (room_code, name, creator_id) 
-SELECT 'BEER01', 'Default Beer Room', (SELECT id FROM users ORDER BY id LIMIT 1)
+SELECT 'BEER01', 'Roy''s Bachelor Party', (SELECT id FROM users ORDER BY id LIMIT 1)
 WHERE NOT EXISTS (SELECT 1 FROM rooms WHERE room_code = 'BEER01');
 
--- Step 4: Migrate all existing users to the default room
+-- Step 4: Migrate all existing users to Roy's Bachelor Party room
 UPDATE users 
 SET room_id = (SELECT id FROM rooms WHERE room_code = 'BEER01') 
 WHERE room_id IS NULL;
