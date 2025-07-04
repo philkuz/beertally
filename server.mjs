@@ -229,6 +229,15 @@ const html = (body) => `<!doctype html>
     
     .remove-btn {
       background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+      min-width: 80px;
+      min-height: 36px;
+      opacity: 0.8;
+    }
+    
+    .remove-btn:hover {
+      opacity: 1;
     }
     
     .submit-btn {
@@ -348,6 +357,11 @@ const html = (body) => `<!doctype html>
         font-size: 1rem;
       }
       
+      .remove-btn {
+        min-height: 42px;
+        font-size: 0.85rem;
+      }
+      
       th, td {
         padding: 0.5rem;
         font-size: 0.9rem;
@@ -459,7 +473,7 @@ app.get("/", async (req, res) => {
             <button type="submit">+1 Beer 🍺</button>
           </form>
           <form method="post" action="/remove" style="display:inline">
-            <button type="submit" class="remove-btn">-1 Beer ❌</button>
+            <button type="submit" class="remove-btn">undo</button>
           </form>
         </div>
         <div class="leaderboard">
