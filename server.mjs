@@ -792,6 +792,7 @@ app.get("/game", (req, res) => {
       y: 300,
       width: 40,
       height: 40,
+      radius: 20, // Half of width/height for circular collision
       velocity: 0,
       gravity: 0.5,
       jump: -10
@@ -805,6 +806,21 @@ app.get("/game", (req, res) => {
     // Face emoji as the bird
     const birdEmoji = '😄';
 
+    // Helper function for circular collision with rectangles
+    function circleRectCollision(cx, cy, radius, rx, ry, rw, rh) {
+      // Find the closest point on the rectangle to the circle center
+      let closestX = Math.max(rx, Math.min(cx, rx + rw));
+      let closestY = Math.max(ry, Math.min(cy, ry + rh));
+      
+      // Calculate the distance from the circle center to this closest point
+      let distanceX = cx - closestX;
+      let distanceY = cy - closestY;
+      
+      // If the distance is less than the circle's radius, an intersection occurs
+      let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+      return distanceSquared < (radius * radius);
+    }
+
     // Game loop
     function gameLoop() {
       if (!gameRunning) return;
@@ -817,8 +833,8 @@ app.get("/game", (req, res) => {
         bird.velocity += bird.gravity;
         bird.y += bird.velocity;
 
-        // Check boundaries
-        if (bird.y <= 0 || bird.y >= canvas.height - bird.height) {
+        // Check boundaries (circular collision)
+        if (bird.y - bird.radius <= 0 || bird.y + bird.radius >= canvas.height - 50) {
           gameOver();
         }
 
@@ -830,6 +846,13 @@ app.get("/game", (req, res) => {
       ctx.font = '40px Arial';
       ctx.textAlign = 'center';
       ctx.fillText(birdEmoji, bird.x + bird.width/2, bird.y + bird.height/2 + 12);
+      
+      // Draw circular collision boundary (debug visualization)
+      ctx.beginPath();
+      ctx.arc(bird.x + bird.width/2, bird.y + bird.height/2, bird.radius, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
       // Draw pipes
       drawPipes();
@@ -872,11 +895,18 @@ app.get("/game", (req, res) => {
       for (let i = pipes.length - 1; i >= 0; i--) {
         pipes[i].x -= 2;
 
-        // Check collision
-        if (pipes[i].x < bird.x + bird.width && pipes[i].x + 50 > bird.x) {
-          if (bird.y < pipes[i].topHeight || bird.y + bird.height > pipes[i].bottomY) {
-            gameOver();
-          }
+        // Check collision (circular collision with pipes)
+        let birdCenterX = bird.x + bird.width / 2;
+        let birdCenterY = bird.y + bird.height / 2;
+        
+        // Check collision with top pipe
+        if (circleRectCollision(birdCenterX, birdCenterY, bird.radius, pipes[i].x, 0, 50, pipes[i].topHeight)) {
+          gameOver();
+        }
+        
+        // Check collision with bottom pipe
+        if (circleRectCollision(birdCenterX, birdCenterY, bird.radius, pipes[i].x, pipes[i].bottomY, 50, pipes[i].bottomHeight)) {
+          gameOver();
         }
 
         // Check if bird passed pipe
@@ -961,6 +991,7 @@ app.get("/game", (req, res) => {
         y: 300,
         width: 40,
         height: 40,
+        radius: 20, // Half of width/height for circular collision
         velocity: 0,
         gravity: 0.5,
         jump: -10
