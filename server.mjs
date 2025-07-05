@@ -683,8 +683,12 @@ app.post("/submit-score", async (req, res) => {
 });
 
 // Flappy Bird Game Route
-app.get("/game", (req, res) => {
-  const gameHtml = `<!doctype html>
+app.get("/game", async (req, res) => {
+  try {
+    const user = await getOrCreateUser(req.session.id);
+    const userName = user ? user.name : '';
+    
+    const gameHtml = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -786,6 +790,10 @@ app.get("/game", (req, res) => {
     const gameOverElement = document.getElementById('gameOver');
     const finalScoreElement = document.getElementById('finalScore');
 
+    // User info from server
+    const userName = '${userName}';
+    const isRoy = userName.toLowerCase() === 'roy';
+
     // Game variables
     let bird = {
       x: 50,
@@ -794,8 +802,8 @@ app.get("/game", (req, res) => {
       height: 40,
       radius: 20, // Half of width/height for circular collision
       velocity: 0,
-      gravity: 0.5,
-      jump: -7
+      gravity: isRoy ? 0.1 : 0.5, // Roy gets super slow gravity
+      jump: isRoy ? -2 : -7 // Roy gets tiny jumps
     };
 
     let pipes = [];
@@ -862,7 +870,7 @@ app.get("/game", (req, res) => {
       ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
 
       // Update score display
-      scoreElement.textContent = 'Score: ' + score;
+      scoreElement.textContent = 'Score: ' + score + (isRoy ? ' 🐌' : '');
 
       // Show start message
       if (!gameStarted) {
@@ -872,6 +880,13 @@ app.get("/game", (req, res) => {
         ctx.font = '24px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('Click or Press SPACE to Start!', canvas.width/2, canvas.height/2);
+        
+        // Special message for Roy
+        if (isRoy) {
+          ctx.fillStyle = '#FFD700';
+          ctx.font = '18px Arial';
+          ctx.fillText('🐌 Roy\'s Slow Motion Mode! 🐌', canvas.width/2, canvas.height/2 + 40);
+        }
       }
 
       requestAnimationFrame(gameLoop);
@@ -893,7 +908,7 @@ app.get("/game", (req, res) => {
 
       // Update pipe positions
       for (let i = pipes.length - 1; i >= 0; i--) {
-        pipes[i].x -= 2;
+        pipes[i].x -= isRoy ? 0.5 : 2; // Roy gets super slow pipes
 
         // Check collision (circular collision with pipes)
         let birdCenterX = bird.x + bird.width / 2;
@@ -993,8 +1008,8 @@ app.get("/game", (req, res) => {
         height: 40,
         radius: 20, // Half of width/height for circular collision
         velocity: 0,
-        gravity: 0.5,
-        jump: -7
+        gravity: isRoy ? 0.1 : 0.5, // Roy gets super slow gravity
+        jump: isRoy ? -2 : -7 // Roy gets tiny jumps
       };
       pipes = [];
       score = 0;
@@ -1027,7 +1042,11 @@ app.get("/game", (req, res) => {
 </body>
 </html>`;
 
-  res.send(gameHtml);
+    res.send(gameHtml);
+  } catch (error) {
+    console.error("Error in GET /game:", error);
+    res.status(500).send("Game error");
+  }
 });
 
 // Flappy Bird Leaderboard Route
