@@ -795,7 +795,7 @@ app.get("/game", (req, res) => {
       radius: 20, // Half of width/height for circular collision
       velocity: 0,
       gravity: 0.5,
-      jump: -10
+      jump: -7
     };
 
     let pipes = [];
@@ -994,7 +994,7 @@ app.get("/game", (req, res) => {
         radius: 20, // Half of width/height for circular collision
         velocity: 0,
         gravity: 0.5,
-        jump: -10
+        jump: -7
       };
       pipes = [];
       score = 0;
