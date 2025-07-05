@@ -871,6 +871,17 @@ app.get("/game", async (req, res) => {
 
       // Update score display
       scoreElement.textContent = 'Score: ' + score + (isRoy ? ' 🐌' : '');
+      
+      // Special overlay for Roy
+      if (isRoy && gameStarted) {
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.font = 'bold 80px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('慢', canvas.width/2, 150);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.strokeText('慢', canvas.width/2, 150);
+      }
 
       // Show start message
       if (!gameStarted) {
