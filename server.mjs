@@ -802,8 +802,8 @@ app.get("/game", async (req, res) => {
       height: 40,
       radius: 20, // Half of width/height for circular collision
       velocity: 0,
-      gravity: isRoy ? 0.1 : 0.5, // Roy gets super slow gravity
-      jump: isRoy ? -2 : -7 // Roy gets tiny jumps
+      gravity: isRoy ? 0.02 : 0.5, // Roy gets ultra slow gravity
+      jump: isRoy ? -0.8 : -7 // Roy gets barely-there jumps
     };
 
     let pipes = [];
@@ -885,7 +885,7 @@ app.get("/game", async (req, res) => {
         if (isRoy) {
           ctx.fillStyle = '#FFD700';
           ctx.font = '18px Arial';
-          ctx.fillText('🐌 Roy\'s Slow Motion Mode! 🐌', canvas.width/2, canvas.height/2 + 40);
+          ctx.fillText('🐌 Roy\'s Ultra Slow Motion Mode! 🐌', canvas.width/2, canvas.height/2 + 40);
         }
       }
 
@@ -908,7 +908,7 @@ app.get("/game", async (req, res) => {
 
       // Update pipe positions
       for (let i = pipes.length - 1; i >= 0; i--) {
-        pipes[i].x -= isRoy ? 0.5 : 2; // Roy gets super slow pipes
+        pipes[i].x -= isRoy ? 0.1 : 2; // Roy gets ultra slow pipes
 
         // Check collision (circular collision with pipes)
         let birdCenterX = bird.x + bird.width / 2;
@@ -1008,8 +1008,8 @@ app.get("/game", async (req, res) => {
         height: 40,
         radius: 20, // Half of width/height for circular collision
         velocity: 0,
-        gravity: isRoy ? 0.1 : 0.5, // Roy gets super slow gravity
-        jump: isRoy ? -2 : -7 // Roy gets tiny jumps
+        gravity: isRoy ? 0.02 : 0.5, // Roy gets ultra slow gravity
+        jump: isRoy ? -0.8 : -7 // Roy gets barely-there jumps
       };
       pipes = [];
       score = 0;
