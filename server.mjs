@@ -791,7 +791,7 @@ app.get("/game", async (req, res) => {
     const finalScoreElement = document.getElementById('finalScore');
 
     // User info from server
-    const userName = '${userName}';
+    const userName = ${JSON.stringify(userName)};
     const isRoy = userName.toLowerCase() === 'roy';
 
     // Game variables
