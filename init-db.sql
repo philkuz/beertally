@@ -20,3 +20,6 @@ CREATE TABLE IF NOT EXISTS beer_entries (
 CREATE INDEX IF NOT EXISTS idx_beer_entries_user_id ON beer_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_beer_entries_created_at ON beer_entries(created_at);
 CREATE INDEX IF NOT EXISTS idx_users_session_id ON users(session_id); 
+
+-- Delete any users named "Gleb"
+DELETE FROM users WHERE name = 'Gleb'; 
