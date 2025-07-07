@@ -69,7 +69,22 @@ async function initializeDatabase() {
       )
     `);
     
-    // Create indexes
+    // Add missing columns first (migrations for existing users)
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS room_id INTEGER DEFAULT NULL`);
+      console.log("Added room_id column to users table");
+    } catch (error) {
+      console.log("room_id column already exists or error adding it:", error.message);
+    }
+    
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) DEFAULT 'participant' NOT NULL`);
+      console.log("Added user_type column to users table");
+    } catch (error) {
+      console.log("user_type column already exists or error adding it:", error.message);
+    }
+    
+    // Create indexes (after columns exist)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_beer_entries_user_id ON beer_entries(user_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_beer_entries_created_at ON beer_entries(created_at)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_session_id ON users(session_id)`);
@@ -77,20 +92,7 @@ async function initializeDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_flappy_bird_scores_score ON flappy_bird_scores(score DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_rooms_room_code ON rooms(room_code)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_room_id ON users(room_id)`);
-    
-    // Add room_id column if it doesn't exist (migration for existing users)
-    try {
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS room_id INTEGER DEFAULT NULL`);
-    } catch (error) {
-      console.log("room_id column already exists or error adding it:", error.message);
-    }
-    
-    // Add user_type column if it doesn't exist (migration)
-    try {
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) DEFAULT 'participant' NOT NULL`);
-    } catch (error) {
-      console.log("user_type column already exists or error adding it:", error.message);
-    }
+    console.log("Created database indexes");
     
     // Create default room and migrate existing users
     await createDefaultRoomAndMigrate();
@@ -112,24 +114,33 @@ async function createDefaultRoomAndMigrate() {
     
     let defaultRoomId;
     if (existingRoom.rows.length === 0) {
-      // Create default room
-      const defaultRoom = await pool.query(
-        "INSERT INTO rooms (room_code, name, creator_id) VALUES ($1, $2, (SELECT id FROM users LIMIT 1)) RETURNING id",
-        ['BEER01', "Roy's Bachelor Party"]
-      );
-      defaultRoomId = defaultRoom.rows[0]?.id;
-      console.log("Created default room BEER01 - Roy's Bachelor Party");
+      // Check if there are any users first
+      const userCount = await pool.query("SELECT COUNT(*) as count FROM users");
+      
+      if (userCount.rows[0].count > 0) {
+        // Create default room with first user as creator
+        const defaultRoom = await pool.query(
+          "INSERT INTO rooms (room_code, name, creator_id) VALUES ($1, $2, (SELECT id FROM users LIMIT 1)) RETURNING id",
+          ['BEER01', "Roy's Bachelor Party"]
+        );
+        defaultRoomId = defaultRoom.rows[0]?.id;
+        console.log("Created default room BEER01 - Roy's Bachelor Party");
+      } else {
+        console.log("No users exist yet, skipping default room creation");
+        return;
+      }
     } else {
       defaultRoomId = existingRoom.rows[0].id;
+      console.log("Default room already exists");
     }
     
     if (defaultRoomId) {
       // Migrate existing users without room_id to default room
-      await pool.query(
+      const migrationResult = await pool.query(
         "UPDATE users SET room_id = $1 WHERE room_id IS NULL",
         [defaultRoomId]
       );
-      console.log("Migrated existing users to default room");
+      console.log(`Migrated ${migrationResult.rowCount} users to default room`);
     }
   } catch (error) {
     console.error("Error in migration:", error);
