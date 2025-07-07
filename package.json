@@ -1,7 +1,7 @@
 {
   "name": "beertally",
   "version": "1.0.0",
-  "description": "A beer tally app with PostgreSQL persistence",
+  "description": "A beer tally app with PostgreSQL persistence and room support",
   "main": "server.mjs",
   "type": "module",
   "scripts": {
@@ -16,6 +16,7 @@
     "express": "^5.1.0",
     "express-session": "^1.18.1",
     "pg": "^8.11.3",
-    "connect-pg-simple": "^9.0.1"
+    "connect-pg-simple": "^9.0.1",
+    "socket.io": "^4.7.2"
   }
 }

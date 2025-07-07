@@ -111,10 +111,10 @@ async function createDefaultRoomAndMigrate() {
       // Create default room
       const defaultRoom = await pool.query(
         "INSERT INTO rooms (room_code, name, creator_id) VALUES ($1, $2, (SELECT id FROM users LIMIT 1)) RETURNING id",
-        ['BEER01', "Roy's Bachelor Party"]
+        ['BEER01', 'Default Beer Room']
       );
       defaultRoomId = defaultRoom.rows[0]?.id;
-      console.log("Created default room BEER01 - Roy's Bachelor Party");
+      console.log("Created default room BEER01");
     } else {
       defaultRoomId = existingRoom.rows[0].id;
     }
@@ -288,31 +288,102 @@ async function getUserRoom(userId) {
   return result.rows[0] || null;
 }
 
-async function saveFlappyBirdScore(userId, score) {
-  await pool.query(
-    "INSERT INTO flappy_bird_scores (user_id, score) VALUES ($1, $2)",
-    [userId, score]
+async function createRoom(userId, roomName) {
+  let roomCode;
+  let attempts = 0;
+  
+  // Generate unique room code
+  do {
+    roomCode = generateRoomCode();
+    attempts++;
+    if (attempts > 10) throw new Error("Failed to generate unique room code");
+  } while (await pool.query("SELECT id FROM rooms WHERE room_code = $1", [roomCode]).then(r => r.rows.length > 0));
+  
+  const result = await pool.query(
+    "INSERT INTO rooms (room_code, name, creator_id) VALUES ($1, $2, $3) RETURNING *",
+    [roomCode, roomName, userId]
   );
+  
+  // Add creator as participant
+  await pool.query(
+    "INSERT INTO room_participants (room_id, user_id) VALUES ($1, $2)",
+    [result.rows[0].id, userId]
+  );
+  
+  return result.rows[0];
 }
 
-async function getFlappyBirdLeaderboard() {
+async function joinRoom(userId, roomCode) {
+  const roomResult = await pool.query(
+    "SELECT * FROM rooms WHERE room_code = $1 AND is_active = true",
+    [roomCode.toUpperCase()]
+  );
+  
+  if (roomResult.rows.length === 0) {
+    throw new Error("Room not found");
+  }
+  
+  const room = roomResult.rows[0];
+  
+  // Check if user is already in room
+  const existingParticipant = await pool.query(
+    "SELECT * FROM room_participants WHERE room_id = $1 AND user_id = $2",
+    [room.id, userId]
+  );
+  
+  if (existingParticipant.rows.length === 0) {
+    await pool.query(
+      "INSERT INTO room_participants (room_id, user_id) VALUES ($1, $2)",
+      [room.id, userId]
+    );
+  } else {
+    // Reactivate participant if they were inactive
+    await pool.query(
+      "UPDATE room_participants SET is_active = true WHERE room_id = $1 AND user_id = $2",
+      [room.id, userId]
+    );
+  }
+  
+  return room;
+}
+
+async function getRoomMessages(roomId, limit = 50) {
   const result = await pool.query(`
-    SELECT u.name, MAX(fbs.score) as best_score, COUNT(fbs.id) as games_played
-    FROM users u
-    JOIN flappy_bird_scores fbs ON u.id = fbs.user_id
-    GROUP BY u.id, u.name
-    ORDER BY best_score DESC
-    LIMIT 10
-  `);
+    SELECT rm.*, u.name as user_name 
+    FROM room_messages rm
+    JOIN users u ON rm.user_id = u.id
+    WHERE rm.room_id = $1
+    ORDER BY rm.created_at DESC
+    LIMIT $2
+  `, [roomId, limit]);
+  
+  return result.rows.reverse();
+}
+
+async function getRoomParticipants(roomId) {
+  const result = await pool.query(`
+    SELECT u.id, u.name
+    FROM room_participants rp
+    JOIN users u ON rp.user_id = u.id
+    WHERE rp.room_id = $1 AND rp.is_active = true
+    ORDER BY rp.joined_at ASC
+  `, [roomId]);
+  
   return result.rows;
 }
 
-async function getUserBestFlappyScore(userId) {
+async function saveMessage(roomId, userId, message) {
   const result = await pool.query(
-    "SELECT MAX(score) as best_score FROM flappy_bird_scores WHERE user_id = $1",
-    [userId]
+    "INSERT INTO room_messages (room_id, user_id, message) VALUES ($1, $2, $3) RETURNING *",
+    [roomId, userId, message]
   );
-  return result.rows[0]?.best_score || 0;
+  
+  const user = await pool.query("SELECT name FROM users WHERE id = $1", [userId]);
+  
+  return {
+    ...result.rows[0],
+    user_name: user.rows[0].name
+  };
 }
 
 // HTML template
@@ -321,7 +392,7 @@ const html = (body) => `<!doctype html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🍻 Beer Tally</title>
+  <title>🏠 Room System</title>
   <style>
     * {
       box-sizing: border-box;
@@ -628,8 +699,99 @@ const html = (body) => `<!doctype html>
 </head>
 <body>
   ${body}
+  <script src="/socket.io/socket.io.js"></script>
 </body>
 </html>`;
+
+// Socket.IO middleware to share session
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, {}, next);
+});
+
+// Socket.IO connection handling
+io.on('connection', async (socket) => {
+  const session = socket.request.session;
+  
+  if (!session.userId) {
+    socket.disconnect();
+    return;
+  }
+  
+  const user = await getOrCreateUser(session.id);
+  if (!user) {
+    socket.disconnect();
+    return;
+  }
+  
+  socket.userId = user.id;
+  socket.userName = user.name;
+  
+  socket.on('join-room', async (roomCode) => {
+    try {
+      const room = await joinRoom(user.id, roomCode);
+      socket.roomId = room.id;
+      socket.roomCode = room.room_code;
+      
+      socket.join(room.room_code);
+      
+      // Send room data
+      const messages = await getRoomMessages(room.id);
+      const participants = await getRoomParticipants(room.id);
+      
+      socket.emit('room-joined', {
+        room: room,
+        messages: messages,
+        participants: participants
+      });
+      
+      // Notify others
+      socket.to(room.room_code).emit('user-joined', {
+        id: user.id,
+        name: user.name
+      });
+      
+      // Update participants list for all users
+      const updatedParticipants = await getRoomParticipants(room.id);
+      io.to(room.room_code).emit('participants-updated', updatedParticipants);
+      
+    } catch (error) {
+      socket.emit('error', error.message);
+    }
+  });
+  
+  socket.on('send-message', async (messageData) => {
+    if (!socket.roomId) return;
+    
+    try {
+      const savedMessage = await saveMessage(socket.roomId, user.id, messageData.message);
+      
+      io.to(socket.roomCode).emit('new-message', {
+        id: savedMessage.id,
+        message: savedMessage.message,
+        user_name: savedMessage.user_name,
+        user_id: savedMessage.user_id,
+        created_at: savedMessage.created_at
+      });
+      
+    } catch (error) {
+      socket.emit('error', 'Failed to send message');
+    }
+  });
+  
+  socket.on('disconnect', async () => {
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('user-left', {
+        id: user.id,
+        name: user.name
+      });
+      
+      if (socket.roomId) {
+        const updatedParticipants = await getRoomParticipants(socket.roomId);
+        socket.to(socket.roomCode).emit('participants-updated', updatedParticipants);
+      }
+    }
+  });
+});
 
 // Routes
 app.get("/", async (req, res) => {
@@ -995,454 +1157,10 @@ app.get("/room/:roomCode", async (req, res) => {
         }
       </script>
     `));
+    
   } catch (error) {
     req.session.error = "Failed to load room.";
     res.redirect("/");
-  }
-});
-
-// Submit Flappy Bird score
-app.post("/submit-score", async (req, res) => {
-  try {
-    if (!dbConnected) {
-      return res.status(500).json({ error: "Database not connected" });
-    }
-    
-    const user = await getOrCreateUser(req.session.id);
-    if (!user) {
-      return res.status(401).json({ error: "User not found" });
-    }
-    
-    const { score } = req.body;
-    if (typeof score !== 'number' || score < 0) {
-      return res.status(400).json({ error: "Invalid score" });
-    }
-    
-    await saveFlappyBirdScore(user.id, score);
-    const bestScore = await getUserBestFlappyScore(user.id);
-    
-    res.json({ 
-      success: true, 
-      score,
-      bestScore,
-      isNewBest: score === bestScore
-    });
-  } catch (error) {
-    console.error("Error in POST /submit-score:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// Flappy Bird Game Route
-app.get("/game", async (req, res) => {
-  try {
-    const user = await getOrCreateUser(req.session.id);
-    const userName = user ? user.name : '';
-    
-    const gameHtml = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🐦 Flappy Bird Game</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: linear-gradient(135deg, #87CEEB 0%, #98D8E8 100%);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      overflow: hidden;
-    }
-    
-    .game-container {
-      text-align: center;
-      position: relative;
-    }
-    
-    canvas {
-      border: 4px solid #333;
-      border-radius: 10px;
-      background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 70%, #90EE90 100%);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    }
-    
-    .score {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      font-size: 24px;
-      font-weight: bold;
-      color: white;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-    
-    .game-over {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      text-align: center;
-      display: none;
-    }
-    
-    .controls {
-      margin-top: 20px;
-      color: white;
-      font-size: 18px;
-      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-    }
-    
-    .home-btn {
-      margin-top: 15px;
-      padding: 10px 20px;
-      font-size: 16px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-block;
-    }
-    
-    .home-btn:hover {
-      background: #45a049;
-    }
-  </style>
-</head>
-<body>
-  <div class="game-container">
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
-    <div class="score" id="score">Score: 0</div>
-    <div class="game-over" id="gameOver">
-      <h2>Game Over!</h2>
-      <p>Your Score: <span id="finalScore">0</span></p>
-      <button onclick="restartGame()">Play Again</button>
-    </div>
-    <div class="controls">
-      <p>Click or Press SPACE to Flap!</p>
-      <a href="/" class="home-btn">🍺 Back to Beer Tally</a>
-      <a href="/flappy-leaderboard" class="home-btn" style="background: #9B59B6; margin-left: 10px;">🏆 Leaderboard</a>
-    </div>
-  </div>
-
-  <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoreElement = document.getElementById('score');
-    const gameOverElement = document.getElementById('gameOver');
-    const finalScoreElement = document.getElementById('finalScore');
-
-    // User info from server
-    const userName = ${JSON.stringify(userName)};
-    const isRoy = userName.toLowerCase() === 'roy';
-
-    // Game variables
-    let bird = {
-      x: 50,
-      y: 300,
-      width: 40,
-      height: 40,
-      radius: 20, // Half of width/height for circular collision
-      velocity: 0,
-      gravity: 0.5, // Fixed gravity for testing
-      jump: -7 // Fixed jump for testing
-    };
-
-    let pipes = [];
-    let score = 0;
-    let gameRunning = true;
-    let gameStarted = false;
-
-    // Face emoji as the bird
-    const birdEmoji = '😄';
-
-    // Helper function for circular collision with rectangles
-    function circleRectCollision(cx, cy, radius, rx, ry, rw, rh) {
-      // Find the closest point on the rectangle to the circle center
-      let closestX = Math.max(rx, Math.min(cx, rx + rw));
-      let closestY = Math.max(ry, Math.min(cy, ry + rh));
-      
-      // Calculate the distance from the circle center to this closest point
-      let distanceX = cx - closestX;
-      let distanceY = cy - closestY;
-      
-      // If the distance is less than the circle's radius, an intersection occurs
-      let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
-      return distanceSquared < (radius * radius);
-    }
-
-    // Game loop
-    function gameLoop() {
-      if (!gameRunning) return;
-
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Update bird
-      if (gameStarted) {
-        bird.velocity += bird.gravity;
-        bird.y += bird.velocity;
-
-        // Check boundaries (circular collision)
-        if (bird.y - bird.radius <= 0 || bird.y + bird.radius >= canvas.height - 50) {
-          gameOver();
-        }
-
-        // Update pipes
-        updatePipes();
-      }
-
-      // Draw bird (face emoji)
-      ctx.font = '40px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(birdEmoji, bird.x + bird.width/2, bird.y + bird.height/2 + 12);
-
-      // Draw pipes
-      drawPipes();
-
-      // Draw ground
-      ctx.fillStyle = '#8B4513';
-      ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-
-      // Update score display
-      scoreElement.textContent = 'Score: ' + score;
-
-      // Show start message
-      if (!gameStarted) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'white';
-        ctx.font = '24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Click or Press SPACE to Start!', canvas.width/2, canvas.height/2);
-      }
-
-      requestAnimationFrame(gameLoop);
-    }
-
-    function updatePipes() {
-      // Add new pipe
-      if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 200) {
-        const gap = 150;
-        const pipeHeight = Math.random() * (canvas.height - gap - 100) + 50;
-        pipes.push({
-          x: canvas.width,
-          topHeight: pipeHeight,
-          bottomY: pipeHeight + gap,
-          bottomHeight: canvas.height - pipeHeight - gap - 50,
-          passed: false
-        });
-      }
-
-      // Update pipe positions
-      for (let i = pipes.length - 1; i >= 0; i--) {
-        pipes[i].x -= 2; // Fixed pipe speed for testing
-
-        // Check collision (circular collision with pipes)
-        let birdCenterX = bird.x + bird.width / 2;
-        let birdCenterY = bird.y + bird.height / 2;
-        
-        // Check collision with top pipe
-        if (circleRectCollision(birdCenterX, birdCenterY, bird.radius, pipes[i].x, 0, 50, pipes[i].topHeight)) {
-          gameOver();
-        }
-        
-        // Check collision with bottom pipe
-        if (circleRectCollision(birdCenterX, birdCenterY, bird.radius, pipes[i].x, pipes[i].bottomY, 50, pipes[i].bottomHeight)) {
-          gameOver();
-        }
-
-        // Check if bird passed pipe
-        if (!pipes[i].passed && pipes[i].x + 50 < bird.x) {
-          pipes[i].passed = true;
-          score++;
-        }
-
-        // Remove off-screen pipes
-        if (pipes[i].x + 50 < 0) {
-          pipes.splice(i, 1);
-        }
-      }
-    }
-
-    function drawPipes() {
-      ctx.fillStyle = '#228B22';
-      ctx.strokeStyle = '#006400';
-      ctx.lineWidth = 2;
-
-      pipes.forEach(pipe => {
-        // Top pipe
-        ctx.fillRect(pipe.x, 0, 50, pipe.topHeight);
-        ctx.strokeRect(pipe.x, 0, 50, pipe.topHeight);
-
-        // Bottom pipe
-        ctx.fillRect(pipe.x, pipe.bottomY, 50, pipe.bottomHeight);
-        ctx.strokeRect(pipe.x, pipe.bottomY, 50, pipe.bottomHeight);
-      });
-    }
-
-    function jump() {
-      if (!gameStarted) {
-        gameStarted = true;
-      }
-      if (gameRunning) {
-        bird.velocity = bird.jump;
-      }
-    }
-
-    function gameOver() {
-      gameRunning = false;
-      finalScoreElement.textContent = score;
-      gameOverElement.style.display = 'block';
-      
-      // Submit score to server
-      if (score > 0) {
-        submitScore(score);
-      }
-    }
-    
-    async function submitScore(gameScore) {
-      try {
-        const response = await fetch('/submit-score', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ score: gameScore })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.isNewBest) {
-            // Show new best score notification
-            const gameOverDiv = document.getElementById('gameOver');
-            const newBestMsg = document.createElement('p');
-            newBestMsg.style.color = '#FFD700';
-            newBestMsg.style.fontWeight = 'bold';
-            newBestMsg.textContent = '🎉 New Best Score! 🎉';
-            gameOverDiv.insertBefore(newBestMsg, gameOverDiv.querySelector('button'));
-          }
-        }
-      } catch (error) {
-        console.error('Error submitting score:', error);
-      }
-    }
-
-    function restartGame() {
-      bird = {
-        x: 50,
-        y: 300,
-        width: 40,
-        height: 40,
-        radius: 20, // Half of width/height for circular collision
-        velocity: 0,
-        gravity: 0.5, // Fixed gravity for testing
-        jump: -7 // Fixed jump for testing
-      };
-      pipes = [];
-      score = 0;
-      gameRunning = true;
-      gameStarted = false;
-      gameOverElement.style.display = 'none';
-      
-      // Clean up any new best score notifications
-      const gameOverDiv = document.getElementById('gameOver');
-      const newBestMsg = gameOverDiv.querySelector('p[style*="color: rgb(255, 215, 0)"]');
-      if (newBestMsg) {
-        newBestMsg.remove();
-      }
-      
-      gameLoop(); // Restart the game loop
-    }
-
-    // Event listeners
-    canvas.addEventListener('click', jump);
-    document.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        jump();
-      }
-    });
-
-    // Start game loop
-    gameLoop();
-  </script>
-</body>
-</html>`;
-
-    res.send(gameHtml);
-  } catch (error) {
-    console.error("Error in GET /game:", error);
-    res.status(500).send("Game error");
-  }
-});
-
-// Flappy Bird Leaderboard Route
-app.get("/flappy-leaderboard", async (req, res) => {
-  try {
-    if (!dbConnected) {
-      return res.send(
-        html(`<div class="header">
-          <h1>🐦 Flappy Bird Leaderboard</h1>
-        </div>
-        <div class="content">
-          <div class="loading">
-            <p>⏳ Setting up database connection... Please refresh in a moment.</p>
-          </div>
-        </div>
-        <script>setTimeout(() => location.reload(), 3000);</script>`)
-      );
-    }
-
-    const leaderboard = await getFlappyBirdLeaderboard();
-    const user = await getOrCreateUser(req.session.id);
-    
-    const leaderboardRows = leaderboard
-      .map((player, i) => {
-        const isCurrentUser = user && player.name === user.name;
-        return `<tr${
-          isCurrentUser ? ' class="current-user"' : ""
-        }><td>${i + 1}</td><td>${escape(player.name)}</td><td>${player.best_score}</td><td>${player.games_played}</td></tr>`;
-      })
-      .join("");
-
-    const currentUserBest = user ? await getUserBestFlappyScore(user.id) : 0;
-
-    res.send(
-      html(`<div class="header">
-        <h1>🐦 Flappy Bird Leaderboard</h1>
-      </div>
-      <div class="content">
-        ${user ? `<div class="user-info">
-          <p>Hi, <strong>${escape(user.name)}</strong>! Your best score: <strong>${currentUserBest}</strong></p>
-        </div>` : ''}
-        <div class="button-group">
-          <a href="/" class="home-btn" style="display:inline-block; padding:10px 20px; background:#4CAF50; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🍺 Back to Beer Tally</a>
-          <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Again!</a>
-        </div>
-        <div class="leaderboard">
-          <h2>🏆 Top Scores</h2>
-          <div class="table-container">
-            <table>
-              <tr><th>#</th><th>Player</th><th>Best Score</th><th>Games Played</th></tr>
-              ${leaderboardRows.length > 0 ? leaderboardRows : '<tr><td colspan="4" style="text-align: center; color: #666;">No scores yet! Be the first to play!</td></tr>'}
-            </table>
-          </div>
-        </div>
-      </div>`)
-    );
-  } catch (error) {
-    console.error("Error in GET /flappy-leaderboard:", error);
-    res.status(500).send("Server error");
   }
 });
 
@@ -1452,8 +1170,8 @@ app.get("/logout", (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🍻 Beer Tally server running on port ${PORT}`);
-  console.log(`🔗 Open http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Room System server running on port ${PORT}`);
+  console.log(`Visit http://localhost:${PORT} to get started`);
 });
 
