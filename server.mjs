@@ -3,8 +3,12 @@ import express from "express";
 import session from "express-session";
 import pg from "pg";
 import connectPgSimple from "connect-pg-simple";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 const app = express();
+const server = createServer(app);
+const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 // PostgreSQL connection
@@ -885,6 +889,7 @@ app.get("/room/:roomCode", async (req, res) => {
         </div>
       </div>
       
+      <script src="/socket.io/socket.io.js"></script>
       <script>
         const socket = io();
         const messagesContainer = document.getElementById('messages-container');
@@ -1451,8 +1456,48 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
+// Socket.IO static file serving
+app.get("/socket.io/socket.io.js", (req, res) => {
+  res.sendFile("socket.io.js", { root: "node_modules/socket.io/client-dist/" });
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  socket.on('join-room', async (roomCode) => {
+    try {
+      socket.join(roomCode);
+      console.log(`Socket ${socket.id} joined room: ${roomCode}`);
+      
+      // Send room data to client (placeholder for now)
+      socket.emit('room-joined', {
+        messages: [],
+        participants: []
+      });
+    } catch (error) {
+      console.error('Error joining room:', error);
+      socket.emit('error', 'Failed to join room');
+    }
+  });
+  
+  socket.on('send-message', async (data) => {
+    try {
+      // Placeholder for message handling
+      console.log('Message received:', data);
+      // Broadcast to room when implemented
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🍻 Beer Tally server running on port ${PORT}`);
   console.log(`🔗 Open http://localhost:${PORT}`);
 });
