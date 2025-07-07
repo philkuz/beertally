@@ -400,6 +400,198 @@ const html = (body) => `<!doctype html>
       margin-bottom: 2rem;
     }
     
+    /* Beer Tally specific styles */
+    .content {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      padding: 2rem;
+    }
+    
+    .total-counter {
+      background: linear-gradient(135deg, #e8f4f8 0%, #d4edda 100%);
+      padding: 2rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      text-align: center;
+      border: 2px solid #bee5eb;
+    }
+    
+    .total-counter h2 {
+      margin: 0;
+      color: #2c5282;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    
+    .total-number {
+      font-size: 4rem;
+      font-weight: 800;
+      color: #d53f8c;
+      display: block;
+      margin-top: 1rem;
+    }
+    
+    .user-info {
+      background: #f8f9fa;
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    
+    .user-info p {
+      margin: 0;
+      font-size: 1.2rem;
+      color: #495057;
+    }
+    
+    .form-section {
+      text-align: center;
+      padding: 2rem;
+    }
+    
+    .form-section h1 {
+      color: #2d3748;
+      margin-bottom: 2rem;
+      font-size: 2rem;
+    }
+    
+    .submit-btn {
+      background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 1rem;
+    }
+    
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    .remove-btn {
+      background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+      min-width: 80px;
+      min-height: 36px;
+      opacity: 0.8;
+    }
+    
+    .remove-btn:hover {
+      opacity: 1;
+    }
+    
+    .leaderboard {
+      margin-top: 2rem;
+    }
+    
+    .leaderboard h2 {
+      color: #2d3748;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1rem;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    th {
+      background: #f7fafc;
+      font-weight: 600;
+      color: #4a5568;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    tr:hover {
+      background: #f8f9fa;
+    }
+    
+    .current-user {
+      background: #e6fffa !important;
+      font-weight: 600;
+    }
+    
+    .current-user:hover {
+      background: #b2f5ea !important;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #718096;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 120px;
+      min-height: 48px;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    input[type="text"] {
+      padding: 0.75rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 1rem;
+    }
+    
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #4299e1;
+      box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    }
+    
     .form-group {
       margin-bottom: 1.5rem;
     }
@@ -648,6 +840,164 @@ const html = (body) => `<!doctype html>
 
 // Routes
 app.get("/", async (req, res) => {
+  try {
+    // Check if database is connected
+    if (!dbConnected) {
+      return res.send(
+        html(`<div class="header">
+          <h1>� Beer Tally</h1>
+        </div>
+        <div class="content">
+          <div class="total-counter">
+            <h2>Total Beers Consumed</h2>
+            <span class="total-number">0</span>
+          </div>
+          <div class="loading">
+            <p>⏳ Setting up database connection... Please refresh in a moment.</p>
+          </div>
+        </div>
+        <script>setTimeout(() => location.reload(), 3000);</script>`)
+      );
+    }
+
+    const user = await getOrCreateUser(req.session.id);
+    
+    if (!user) {
+      return res.send(
+        html(`<div class="header">
+          <h1>� Beer Tally</h1>
+        </div>
+        <div class="content">
+          <div class="form-section">
+            <h1>What's your name?</h1>
+            <form action="/set-name" method="POST">
+              <input type="text" name="name" placeholder="Enter your name" required maxlength="30">
+              <button type="submit" class="submit-btn">Start Tallying</button>
+            </form>
+            
+            <div class="button-group">
+              <form action="/set-name" method="POST" style="display: inline;">
+                <input type="hidden" name="name" value="Observer">
+                <input type="hidden" name="user_type" value="observer">
+                <button type="submit" class="submit-btn" style="background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);">Join as Observer</button>
+              </form>
+            </div>
+          </div>
+        </div>`)
+      );
+    }
+
+    const totalBeerCount = await getTotalBeerCount();
+    const userBeerCount = await getBeerCount(user.id);
+    const leaderboard = await getLeaderboard();
+
+    const participantRows = leaderboard.participants
+      .map((d, i) => {
+        const isCurrentUser = d.name === user.name;
+        return `<tr${
+          isCurrentUser ? ' class="current-user"' : ""
+        }><td>${i + 1}</td><td>${escape(d.name)}</td><td>${d.count}</td></tr>`;
+      })
+      .join("");
+
+    const observerRows = leaderboard.observers
+      .map((d, i) => {
+        const isCurrentUser = d.name === user.name;
+        return `<tr${
+          isCurrentUser ? ' class="current-user"' : ""
+        }><td>${i + 1}</td><td>${escape(d.name)}</td><td>${d.count}</td></tr>`;
+      })
+      .join("");
+
+    res.send(
+      html(`<div class="header">
+        <h1>🍺 Beer Tally</h1>
+      </div>
+      <div class="content">
+        <div class="total-counter">
+          <h2>Total Beers Consumed</h2>
+          <span class="total-number">${totalBeerCount}</span>
+        </div>
+        <div class="user-info">
+          <p>Hi, <strong>${escape(user.name)}</strong>! You're ${user.user_type === 'observer' ? 'observing' : 'participating'}. Your count: <strong>${userBeerCount}</strong></p>
+        </div>
+        <div class="button-group">
+          <form action="/add" method="POST" style="display: inline;">
+            <button type="submit" ${user.user_type === 'observer' ? 'disabled' : ''}>+1 Beer</button>
+          </form>
+          <form action="/remove" method="POST" style="display: inline;">
+            <button type="submit" class="remove-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>undo</button>
+          </form>
+          <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Flappy Bird!</a>
+          <a href="/flappy-leaderboard" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#9B59B6; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🏆 Bird Scores</a>
+        </div>
+        <div class="leaderboard">
+          <h2>🏆 Participants</h2>
+          <div class="table-container">
+            <table>
+              <tr><th>#</th><th>Name</th><th>Count</th></tr>
+              ${participantRows}
+            </table>
+          </div>
+          ${observerRows.length > 0 ? `
+          <h2 style="margin-top: 2rem;">👀 Observers</h2>
+          <div class="table-container">
+            <table>
+              <tr><th>#</th><th>Name</th><th>Count</th></tr>
+              ${observerRows}
+            </table>
+          </div>` : ''}
+        </div>
+        <div style="text-align: center; margin-top: 2rem;">
+          <a href="/rooms" style="display:inline-block; padding:8px 16px; background:#667eea; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">🏠 Room System</a>
+          <a href="/logout" style="display:inline-block; margin-left:10px; padding:8px 16px; background:#718096; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">Change Name</a>
+        </div>
+      </div>`)
+    );
+  } catch (error) {
+    console.error("Error in GET /:", error);
+    res.status(500).send("Server error");
+  }
+});
+
+app.post("/set-name", async (req, res) => {
+  const { name, user_type } = req.body;
+  
+  if (!name || name.trim().length === 0) {
+    return res.redirect("/");
+  }
+  
+  try {
+    const userType = user_type || 'participant';
+    
+    // Check if user already exists
+    let user = await getOrCreateUser(req.session.id);
+    
+    if (!user) {
+      // Create new user
+      const result = await pool.query(
+        "INSERT INTO users (session_id, name, user_type) VALUES ($1, $2, $3) RETURNING *",
+        [req.session.id, name.trim(), userType]
+      );
+      user = result.rows[0];
+    } else {
+      // Update existing user
+      const result = await pool.query(
+        "UPDATE users SET name = $1, user_type = $2 WHERE session_id = $3 RETURNING *",
+        [name.trim(), userType, req.session.id]
+      );
+      user = result.rows[0];
+    }
+    
+    res.redirect("/");
+  } catch (error) {
+    console.error("Error in set-name:", error);
+    res.redirect("/");
+  }
+});
+
+// Move room system to /rooms
+app.get("/rooms", async (req, res) => {
   if (!dbConnected) {
     return res.send(html(`
       <div class="container">
@@ -714,36 +1064,59 @@ app.get("/", async (req, res) => {
             <a href="/join-room" class="btn btn-secondary">Join Room</a>
           </div>
           
-          <p style="margin-top: 2rem; color: #718096; font-size: 0.9rem;">
-            <a href="/logout" style="color: #667eea;">Change Name</a>
-          </p>
+          <div style="text-align: center; margin-top: 2rem;">
+            <a href="/" style="color: #667eea;">← Back to Beer Tally</a>
+          </div>
         </div>
       </div>
     </div>
   `));
 });
 
-app.post("/set-name", async (req, res) => {
-  const { name } = req.body;
-  
-  if (!name || name.trim().length === 0) {
-    return res.redirect("/");
-  }
-  
+// Add beer
+app.post("/add", async (req, res) => {
   try {
-    const user = await getOrCreateUser(req.session.id, name.trim());
-    req.session.userId = user.id;
-    req.session.message = "Welcome! You're all set.";
+    if (!dbConnected) {
+      return res.redirect("/");
+    }
+    const user = await getOrCreateUser(req.session.id);
+    if (user) {
+      await pool.query(
+        "INSERT INTO beer_entries (user_id) VALUES ($1)",
+        [user.id]
+      );
+    }
     res.redirect("/");
   } catch (error) {
-    req.session.error = "Failed to create user profile.";
+    console.error("Error in POST /add:", error);
+    res.status(500).send("Server error");
+  }
+});
+
+// Remove beer
+app.post("/remove", async (req, res) => {
+  try {
+    if (!dbConnected) {
+      return res.redirect("/");
+    }
+    const user = await getOrCreateUser(req.session.id);
+    if (user) {
+      // Remove the most recent beer entry
+      await pool.query(
+        "DELETE FROM beer_entries WHERE id = (SELECT id FROM beer_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1)",
+        [user.id]
+      );
+    }
     res.redirect("/");
+  } catch (error) {
+    console.error("Error in POST /remove:", error);
+    res.status(500).send("Server error");
   }
 });
 
 app.get("/create-room", async (req, res) => {
   const user = await getOrCreateUser(req.session.id);
-  if (!user) return res.redirect("/");
+  if (!user) return res.redirect("/rooms");
   
   res.send(html(`
     <div class="container">
@@ -762,7 +1135,7 @@ app.get("/create-room", async (req, res) => {
             </div>
             <div class="button-group">
               <button type="submit" class="btn">Create Room</button>
-              <a href="/" class="btn btn-secondary">Cancel</a>
+              <a href="/rooms" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
         </div>
@@ -773,7 +1146,7 @@ app.get("/create-room", async (req, res) => {
 
 app.post("/create-room", async (req, res) => {
   const user = await getOrCreateUser(req.session.id);
-  if (!user) return res.redirect("/");
+  if (!user) return res.redirect("/rooms");
   
   const { roomName } = req.body;
   
@@ -793,7 +1166,7 @@ app.post("/create-room", async (req, res) => {
 
 app.get("/join-room", async (req, res) => {
   const user = await getOrCreateUser(req.session.id);
-  if (!user) return res.redirect("/");
+  if (!user) return res.redirect("/rooms");
   
   res.send(html(`
     <div class="container">
@@ -812,7 +1185,7 @@ app.get("/join-room", async (req, res) => {
             </div>
             <div class="button-group">
               <button type="submit" class="btn">Join Room</button>
-              <a href="/" class="btn btn-secondary">Cancel</a>
+              <a href="/rooms" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
         </div>
@@ -823,7 +1196,7 @@ app.get("/join-room", async (req, res) => {
 
 app.post("/join-room", async (req, res) => {
   const user = await getOrCreateUser(req.session.id);
-  if (!user) return res.redirect("/");
+  if (!user) return res.redirect("/rooms");
   
   const { roomCode } = req.body;
   
@@ -843,7 +1216,7 @@ app.post("/join-room", async (req, res) => {
 
 app.get("/room/:roomCode", async (req, res) => {
   const user = await getOrCreateUser(req.session.id);
-  if (!user) return res.redirect("/");
+  if (!user) return res.redirect("/rooms");
   
   const { roomCode } = req.params;
   
@@ -855,7 +1228,7 @@ app.get("/room/:roomCode", async (req, res) => {
     
     if (roomResult.rows.length === 0) {
       req.session.error = "Room not found.";
-      return res.redirect("/");
+      return res.redirect("/rooms");
     }
     
     const room = roomResult.rows[0];
@@ -894,7 +1267,7 @@ app.get("/room/:roomCode", async (req, res) => {
             </div>
             
             <div style="text-align: center; margin-top: 1rem;">
-              <a href="/" class="btn btn-danger">Leave Room</a>
+              <a href="/rooms" class="btn btn-danger">Leave Room</a>
             </div>
           </div>
         </div>
@@ -1013,7 +1386,7 @@ app.get("/room/:roomCode", async (req, res) => {
     `));
   } catch (error) {
     req.session.error = "Failed to load room.";
-    res.redirect("/");
+    res.redirect("/rooms");
   }
 });
 
