@@ -193,16 +193,17 @@ async function getLeaderboard(roomId = null) {
   let params = [];
   
   if (roomId) {
-    whereClause = "WHERE u.room_id = $1";
+    whereClause = "WHERE u.room_id = $1 AND";
     params = [roomId];
+  } else {
+    whereClause = "WHERE";
   }
   
   const participants = await pool.query(`
     SELECT u.name, COUNT(be.id) as count
     FROM users u
     LEFT JOIN beer_entries be ON u.id = be.user_id
-    ${whereClause}
-    ${roomId ? "" : "AND"} u.user_type = 'participant'
+    ${whereClause} u.user_type = 'participant'
     GROUP BY u.id, u.name
     ORDER BY count DESC
   `, params);
@@ -211,8 +212,7 @@ async function getLeaderboard(roomId = null) {
     SELECT u.name, COUNT(be.id) as count
     FROM users u
     LEFT JOIN beer_entries be ON u.id = be.user_id
-    ${whereClause}
-    ${roomId ? "" : "AND"} u.user_type = 'observer'
+    ${whereClause} u.user_type = 'observer'
     GROUP BY u.id, u.name
     ORDER BY count DESC
   `, params);
