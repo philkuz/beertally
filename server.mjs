@@ -619,13 +619,26 @@ const html = (body) => `<!doctype html>
         gap: 0.75rem;
       }
       
+      .beer-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+      }
+      
       button {
         width: 100%;
         min-height: 52px;
         font-size: 1rem;
       }
       
+      .add-beer-btn {
+        width: 100%;
+        min-height: 55px;
+        font-size: 1.2rem;
+      }
+      
       .remove-btn {
+        width: 100%;
         min-height: 42px;
         font-size: 0.85rem;
       }
@@ -688,10 +701,11 @@ const html = (body) => `<!doctype html>
     
     .button-group {
       display: flex;
+      flex-direction: column;
       gap: 1rem;
       justify-content: center;
-      margin: 2rem 0;
-      flex-wrap: wrap;
+      align-items: center;
+      margin: 1rem 0;
     }
     
     .btn {
@@ -724,6 +738,45 @@ const html = (body) => `<!doctype html>
     
     .btn-danger {
       background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+    }
+    
+    /* Beer Tally specific button styles */
+    .beer-controls {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    
+    .add-beer-btn {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 180px;
+      min-height: 60px;
+    }
+    
+    .add-beer-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .add-beer-btn:active {
+      transform: translateY(0);
+    }
+    
+    .game-controls {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
     }
     
     .room-info {
@@ -893,6 +946,23 @@ const html = (body) => `<!doctype html>
         align-items: center;
       }
       
+      .beer-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      
+      .add-beer-btn {
+        width: 100%;
+        max-width: 280px;
+        min-height: 55px;
+        font-size: 1.2rem;
+      }
+      
+      .game-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      
       .btn {
         width: 100%;
         max-width: 300px;
@@ -994,14 +1064,18 @@ app.get("/", async (req, res) => {
             <p>Hi, <strong>${escape(user.name)}</strong>${user.user_type === 'observer' ? ' 👀' : ' 🍺'}! You've had <strong>${userBeerCount}</strong> beer${userBeerCount === 1 ? "" : "s"}.</p>
           </div>
           <div class="button-group">
-            <form action="/add" method="POST" style="display: inline;">
-              <button type="submit" ${user.user_type === 'observer' ? 'disabled' : ''}>+1 Beer 🍺</button>
-            </form>
-            <form action="/remove" method="POST" style="display: inline;">
-              <button type="submit" class="remove-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>undo</button>
-            </form>
-            <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Flappy Bird!</a>
-            <a href="/flappy-leaderboard" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#9B59B6; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🏆 Bird Scores</a>
+            <div class="beer-controls">
+              <form action="/add" method="POST" style="display: inline;">
+                <button type="submit" class="add-beer-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>+1 Beer 🍺</button>
+              </form>
+              <form action="/remove" method="POST" style="display: inline;">
+                <button type="submit" class="remove-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>undo</button>
+              </form>
+            </div>
+            <div class="game-controls">
+              <a href="/game" style="display:inline-block; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Flappy Bird!</a>
+              <a href="/flappy-leaderboard" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#9B59B6; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🏆 Bird Scores</a>
+            </div>
           </div>
           <div class="leaderboard">
             <h2>🏆 Participants</h2>
