@@ -400,20 +400,24 @@ const html = (body) => `<!doctype html>
       margin-bottom: 2rem;
     }
     
-    /* Beer Tally specific styles */
-    .content {
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
       background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       overflow: hidden;
-      padding: 2rem;
+    }
+    
+    .content {
+      padding: 1.5rem;
     }
     
     .total-counter {
       background: linear-gradient(135deg, #e8f4f8 0%, #d4edda 100%);
-      padding: 2rem;
+      padding: 1.5rem;
       border-radius: 12px;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       text-align: center;
       border: 2px solid #bee5eb;
     }
@@ -421,29 +425,29 @@ const html = (body) => `<!doctype html>
     .total-counter h2 {
       margin: 0;
       color: #2c5282;
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       font-weight: 600;
     }
     
     .total-number {
-      font-size: 4rem;
+      font-size: 3rem;
       font-weight: 800;
       color: #d53f8c;
       display: block;
-      margin-top: 1rem;
+      margin-top: 0.5rem;
     }
     
     .user-info {
       background: #f8f9fa;
-      padding: 1.5rem;
+      padding: 1rem;
       border-radius: 8px;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       text-align: center;
     }
     
     .user-info p {
       margin: 0;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       color: #495057;
     }
     
@@ -454,8 +458,8 @@ const html = (body) => `<!doctype html>
     
     .form-section h1 {
       color: #2d3748;
-      margin-bottom: 2rem;
-      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      font-size: 1.8rem;
     }
     
     .submit-btn {
@@ -590,6 +594,69 @@ const html = (body) => `<!doctype html>
       outline: none;
       border-color: #4299e1;
       box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      body {
+        padding: 0.5rem;
+      }
+      
+      .header h1 {
+        font-size: 1.5rem;
+      }
+      
+      .total-number {
+        font-size: 2.5rem;
+      }
+      
+      .content {
+        padding: 1rem;
+      }
+      
+      .button-group {
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      
+      button {
+        width: 100%;
+        min-height: 52px;
+        font-size: 1rem;
+      }
+      
+      .remove-btn {
+        min-height: 42px;
+        font-size: 0.85rem;
+      }
+      
+      th, td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+      }
+      
+      .total-counter {
+        padding: 1rem;
+      }
+      
+      .total-counter h2 {
+        font-size: 1.1rem;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .header h1 {
+        font-size: 1.3rem;
+      }
+      
+      .total-number {
+        font-size: 2rem;
+      }
+      
+      th, td {
+        padding: 0.4rem;
+        font-size: 0.8rem;
+      }
     }
     
     .form-group {
@@ -844,16 +911,18 @@ app.get("/", async (req, res) => {
     // Check if database is connected
     if (!dbConnected) {
       return res.send(
-        html(`<div class="header">
-          <h1>� Beer Tally</h1>
-        </div>
-        <div class="content">
-          <div class="total-counter">
-            <h2>Total Beers Consumed</h2>
-            <span class="total-number">0</span>
+        html(`<div class="container">
+          <div class="header">
+            <h1>🍺 Beer Tally</h1>
           </div>
-          <div class="loading">
-            <p>⏳ Setting up database connection... Please refresh in a moment.</p>
+          <div class="content">
+            <div class="total-counter">
+              <h2>Total Beers Consumed</h2>
+              <span class="total-number">0</span>
+            </div>
+            <div class="loading">
+              <p>⏳ Setting up database connection... Please refresh in a moment.</p>
+            </div>
           </div>
         </div>
         <script>setTimeout(() => location.reload(), 3000);</script>`)
@@ -864,23 +933,25 @@ app.get("/", async (req, res) => {
     
     if (!user) {
       return res.send(
-        html(`<div class="header">
-          <h1>� Beer Tally</h1>
-        </div>
-        <div class="content">
-          <div class="form-section">
-            <h1>What's your name?</h1>
-            <form action="/set-name" method="POST">
-              <input type="text" name="name" placeholder="Enter your name" required maxlength="30">
-              <button type="submit" class="submit-btn">Start Tallying</button>
-            </form>
-            
-            <div class="button-group">
-              <form action="/set-name" method="POST" style="display: inline;">
-                <input type="hidden" name="name" value="Observer">
-                <input type="hidden" name="user_type" value="observer">
-                <button type="submit" class="submit-btn" style="background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);">Join as Observer</button>
+        html(`<div class="container">
+          <div class="header">
+            <h1>🍺 Beer Tally</h1>
+          </div>
+          <div class="content">
+            <div class="form-section">
+              <h1>What's your name?</h1>
+              <form action="/set-name" method="POST">
+                <input type="text" name="name" placeholder="Enter your name" required maxlength="30">
+                <button type="submit" class="submit-btn">Start Tallying</button>
               </form>
+              
+              <div class="button-group">
+                <form action="/set-name" method="POST" style="display: inline;">
+                  <input type="hidden" name="name" value="Observer">
+                  <input type="hidden" name="user_type" value="observer">
+                  <button type="submit" class="submit-btn" style="background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);">Join as Observer</button>
+                </form>
+              </div>
             </div>
           </div>
         </div>`)
@@ -910,47 +981,43 @@ app.get("/", async (req, res) => {
       .join("");
 
     res.send(
-      html(`<div class="header">
-        <h1>🍺 Beer Tally</h1>
-      </div>
-      <div class="content">
-        <div class="total-counter">
-          <h2>Total Beers Consumed</h2>
-          <span class="total-number">${totalBeerCount}</span>
+      html(`<div class="container">
+        <div class="header">
+          <h1>🍺 Beer Tally</h1>
         </div>
-        <div class="user-info">
-          <p>Hi, <strong>${escape(user.name)}</strong>! You're ${user.user_type === 'observer' ? 'observing' : 'participating'}. Your count: <strong>${userBeerCount}</strong></p>
-        </div>
-        <div class="button-group">
-          <form action="/add" method="POST" style="display: inline;">
-            <button type="submit" ${user.user_type === 'observer' ? 'disabled' : ''}>+1 Beer</button>
-          </form>
-          <form action="/remove" method="POST" style="display: inline;">
-            <button type="submit" class="remove-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>undo</button>
-          </form>
-          <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Flappy Bird!</a>
-          <a href="/flappy-leaderboard" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#9B59B6; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🏆 Bird Scores</a>
-        </div>
-        <div class="leaderboard">
-          <h2>🏆 Participants</h2>
-          <div class="table-container">
-            <table>
-              <tr><th>#</th><th>Name</th><th>Count</th></tr>
-              ${participantRows}
-            </table>
+        <div class="content">
+          <div class="total-counter">
+            <h2>Total Beers Consumed</h2>
+            <span class="total-number">${totalBeerCount}</span>
           </div>
-          ${observerRows.length > 0 ? `
-          <h2 style="margin-top: 2rem;">👀 Observers</h2>
-          <div class="table-container">
-            <table>
-              <tr><th>#</th><th>Name</th><th>Count</th></tr>
-              ${observerRows}
-            </table>
-          </div>` : ''}
-        </div>
-        <div style="text-align: center; margin-top: 2rem;">
-          <a href="/rooms" style="display:inline-block; padding:8px 16px; background:#667eea; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">🏠 Room System</a>
-          <a href="/logout" style="display:inline-block; margin-left:10px; padding:8px 16px; background:#718096; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">Change Name</a>
+          <div class="user-info">
+            <p>Hi, <strong>${escape(user.name)}</strong>${user.user_type === 'observer' ? ' 👀' : ' 🍺'}! You've had <strong>${userBeerCount}</strong> beer${userBeerCount === 1 ? "" : "s"}.</p>
+          </div>
+          <div class="button-group">
+            <form action="/add" method="POST" style="display: inline;">
+              <button type="submit" ${user.user_type === 'observer' ? 'disabled' : ''}>+1 Beer 🍺</button>
+            </form>
+            <form action="/remove" method="POST" style="display: inline;">
+              <button type="submit" class="remove-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>undo</button>
+            </form>
+            <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Flappy Bird!</a>
+            <a href="/flappy-leaderboard" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#9B59B6; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🏆 Bird Scores</a>
+          </div>
+          <div class="leaderboard">
+            <h2>🏆 Participants</h2>
+            <div class="table-container">
+              <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${participantRows}</table>
+            </div>
+            ${observerRows.length > 0 ? `
+            <h2 style="margin-top: 2rem;">👀 Observers</h2>
+            <div class="table-container">
+              <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${observerRows}</table>
+            </div>` : ''}
+          </div>
+          <div style="text-align: center; margin-top: 2rem;">
+            <a href="/rooms" style="display:inline-block; padding:8px 16px; background:#667eea; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">🏠 Room System</a>
+            <a href="/logout" style="display:inline-block; margin-left:10px; padding:8px 16px; background:#718096; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">Change Name</a>
+          </div>
         </div>
       </div>`)
     );
@@ -1807,24 +1874,26 @@ app.get("/flappy-leaderboard", async (req, res) => {
     const currentUserBest = user ? await getUserBestFlappyScore(user.id) : 0;
 
     res.send(
-      html(`<div class="header">
-        <h1>🐦 Flappy Bird Leaderboard</h1>
-      </div>
-      <div class="content">
-        ${user ? `<div class="user-info">
-          <p>Hi, <strong>${escape(user.name)}</strong>! Your best score: <strong>${currentUserBest}</strong></p>
-        </div>` : ''}
-        <div class="button-group">
-          <a href="/" class="home-btn" style="display:inline-block; padding:10px 20px; background:#4CAF50; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🍺 Back to Beer Tally</a>
-          <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Again!</a>
+      html(`<div class="container">
+        <div class="header">
+          <h1>🐦 Flappy Bird Leaderboard</h1>
         </div>
-        <div class="leaderboard">
-          <h2>🏆 Top Scores</h2>
-          <div class="table-container">
-            <table>
-              <tr><th>#</th><th>Player</th><th>Best Score</th><th>Games Played</th></tr>
-              ${leaderboardRows.length > 0 ? leaderboardRows : '<tr><td colspan="4" style="text-align: center; color: #666;">No scores yet! Be the first to play!</td></tr>'}
-            </table>
+        <div class="content">
+          ${user ? `<div class="user-info">
+            <p>Hi, <strong>${escape(user.name)}</strong>! Your best score: <strong>${currentUserBest}</strong></p>
+          </div>` : ''}
+          <div class="button-group">
+            <a href="/" class="home-btn" style="display:inline-block; padding:10px 20px; background:#4CAF50; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🍺 Back to Beer Tally</a>
+            <a href="/game" style="display:inline-block; margin-left:10px; padding:10px 20px; background:#FF6B6B; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">🐦 Play Again!</a>
+          </div>
+          <div class="leaderboard">
+            <h2>🏆 Top Scores</h2>
+            <div class="table-container">
+              <table>
+                <tr><th>#</th><th>Player</th><th>Best Score</th><th>Games Played</th></tr>
+                ${leaderboardRows.length > 0 ? leaderboardRows : '<tr><td colspan="4" style="text-align: center; color: #666;">No scores yet! Be the first to play!</td></tr>'}
+              </table>
+            </div>
           </div>
         </div>
       </div>`)
