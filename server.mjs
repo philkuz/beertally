@@ -1880,6 +1880,18 @@ io.on('connection', (socket) => {
   });
 });
 
+// Helper function for HTML escaping
+const escape = (s) => {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+};
+
 // Start server
 server.listen(PORT, () => {
   console.log(`🍻 Beer Tally server running on port ${PORT}`);
