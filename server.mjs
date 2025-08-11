@@ -1373,161 +1373,163 @@ app.get("/room/:roomCode", async (req, res) => {
     }
     
     const room = roomResult.rows[0];
-    
+
+    // Move user into this room upon visiting
+    if (user.room_id !== room.id) {
+      await pool.query("UPDATE users SET room_id = $1 WHERE id = $2", [room.id, user.id]);
+      user.room_id = room.id;
+    }
+
+    // Compute room-scoped stats
+    const totalBeerCount = await getTotalBeerCount(room.id);
+    const userBeerCount = await getBeerCount(user.id);
+    const leaderboard = await getLeaderboard(room.id);
+
+    const participantRows = leaderboard.participants
+      .map((d, i) => {
+        const isCurrentUser = d.name === user.name;
+        return `<tr${isCurrentUser ? ' class="current-user"' : ''}><td>${i + 1}</td><td>${escape(d.name)}</td><td>${d.count}</td></tr>`;
+      })
+      .join("");
+
+    const observerRows = leaderboard.observers
+      .map((d, i) => {
+        const isCurrentUser = d.name === user.name;
+        return `<tr${isCurrentUser ? ' class="current-user"' : ''}><td>${i + 1}</td><td>${escape(d.name)}</td><td>${d.count}</td></tr>`;
+      })
+      .join("");
+
     res.send(html(`
       <div class="container">
         <div class="header">
-          <h1>🏠 ${room.name}</h1>
+          <h1>🍺 Beer Tally — ${escape(room.name)}</h1>
         </div>
-        <div class="main-content">
-          <div style="padding: 1rem;">
-            <div class="room-info">
-              <h3>Room Code:</h3>
-              <div class="room-code">${room.room_code}</div>
-              <p>Share this code with others to join the room</p>
+        <div class="content">
+          <div class="room-info" style="margin-bottom: 1rem;">
+            <h3>Room Code:</h3>
+            <div class="room-code">${room.room_code}</div>
+            <p>Share this code with others to join the room</p>
+          </div>
+
+          <div class="total-counter">
+            <h2>Total Beers in Room</h2>
+            <span class="total-number">${totalBeerCount}</span>
+          </div>
+
+          <div class="user-info">
+            <p>Hi, <strong>${escape(user.name)}</strong>${user.user_type === 'observer' ? ' 👀' : ' 🍺'}! You've had <strong>${userBeerCount}</strong> beer${userBeerCount === 1 ? '' : 's'}.</p>
+          </div>
+
+          <div class="button-group">
+            <div class="beer-controls">
+              <form action="/room/${room.room_code}/add" method="POST" style="display: inline;">
+                <button type="submit" class="add-beer-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>+1 Beer 🍺</button>
+              </form>
+              <form action="/room/${room.room_code}/remove" method="POST" style="display: inline;">
+                <button type="submit" class="remove-btn" ${user.user_type === 'observer' ? 'disabled' : ''}>undo</button>
+              </form>
             </div>
-            
-            <div class="chat-container">
-              <div class="participants-panel">
-                <h3>Participants</h3>
-                <div id="participants-list"></div>
-              </div>
-              
-              <div class="chat-main">
-                <div class="messages-container" id="messages-container">
-                  <div style="text-align: center; color: #a0aec0; padding: 2rem;">
-                    Loading messages...
-                  </div>
-                </div>
-                
-                <div class="message-input-container">
-                  <input type="text" id="message-input" class="message-input" placeholder="Type your message..." maxlength="500">
-                  <button id="send-btn" class="send-btn">Send</button>
-                </div>
-              </div>
+          </div>
+
+          <div class="leaderboard">
+            <h2>🏆 Participants</h2>
+            <div class="table-container">
+              <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${participantRows}</table>
             </div>
-            
-            <div style="text-align: center; margin-top: 1rem;">
-              <a href="/rooms" class="btn btn-danger">Leave Room</a>
-            </div>
+            ${observerRows.length > 0 ? `
+            <h2 style="margin-top: 2rem;">👀 Observers</h2>
+            <div class="table-container">
+              <table><tr><th>#</th><th>Name</th><th>Beers</th></tr>${observerRows}</table>
+            </div>` : ''}
+          </div>
+
+          <div style="text-align: center; margin-top: 2rem;">
+            <a href="/rooms" style="display:inline-block; padding:8px 16px; background:#667eea; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">🏠 Room System</a>
+            <a href="/" style="display:inline-block; margin-left:10px; padding:8px 16px; background:#4CAF50; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">🍺 Global Tally</a>
+            <a href="/logout" style="display:inline-block; margin-left:10px; padding:8px 16px; background:#718096; color:white; text-decoration:none; border-radius:5px; font-size:0.9rem;">Change Name</a>
           </div>
         </div>
       </div>
-      
-      <script src="/socket.io/socket.io.js"></script>
-      <script>
-        const socket = io();
-        const messagesContainer = document.getElementById('messages-container');
-        const messageInput = document.getElementById('message-input');
-        const sendBtn = document.getElementById('send-btn');
-        const participantsList = document.getElementById('participants-list');
-        
-        let currentUserId = ${user.id};
-        let currentUserName = '${user.name}';
-        
-        // Join room
-        socket.emit('join-room', '${roomCode.toUpperCase()}');
-        
-        // Room joined event
-        socket.on('room-joined', (data) => {
-          displayMessages(data.messages);
-          updateParticipants(data.participants);
-        });
-        
-        // New message event
-        socket.on('new-message', (message) => {
-          addMessage(message);
-        });
-        
-        // Participants updated event
-        socket.on('participants-updated', (participants) => {
-          updateParticipants(participants);
-        });
-        
-        // User joined event
-        socket.on('user-joined', (user) => {
-          addSystemMessage(user.name + ' joined the room');
-        });
-        
-        // User left event
-        socket.on('user-left', (user) => {
-          addSystemMessage(user.name + ' left the room');
-        });
-        
-        // Error event
-        socket.on('error', (error) => {
-          alert('Error: ' + error);
-        });
-        
-        // Send message
-        function sendMessage() {
-          const message = messageInput.value.trim();
-          if (message) {
-            socket.emit('send-message', { message: message });
-            messageInput.value = '';
-          }
-        }
-        
-        sendBtn.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            sendMessage();
-          }
-        });
-        
-        function displayMessages(messages) {
-          messagesContainer.innerHTML = '';
-          messages.forEach(addMessage);
-        }
-        
-        function addMessage(message) {
-          const messageDiv = document.createElement('div');
-          messageDiv.className = 'message' + (message.user_id === currentUserId ? ' own-message' : '');
-          
-          const time = new Date(message.created_at).toLocaleTimeString();
-          
-          messageDiv.innerHTML = \`
-            <div class="message-author">\${message.user_name}</div>
-            <div class="message-content">\${escapeHtml(message.message)}</div>
-            <div class="message-time">\${time}</div>
-          \`;
-          
-          messagesContainer.appendChild(messageDiv);
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-        
-        function addSystemMessage(text) {
-          const messageDiv = document.createElement('div');
-          messageDiv.style.textAlign = 'center';
-          messageDiv.style.color = '#a0aec0';
-          messageDiv.style.fontSize = '0.9rem';
-          messageDiv.style.margin = '1rem 0';
-          messageDiv.textContent = text;
-          
-          messagesContainer.appendChild(messageDiv);
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-        
-        function updateParticipants(participants) {
-          participantsList.innerHTML = '';
-          participants.forEach(participant => {
-            const participantDiv = document.createElement('div');
-            participantDiv.className = 'participant' + (participant.id === currentUserId ? ' current-user' : '');
-            participantDiv.textContent = participant.name + (participant.id === currentUserId ? ' (You)' : '');
-            participantsList.appendChild(participantDiv);
-          });
-        }
-        
-        function escapeHtml(text) {
-          const div = document.createElement('div');
-          div.textContent = text;
-          return div.innerHTML;
-        }
-      </script>
     `));
   } catch (error) {
     req.session.error = "Failed to load room.";
     res.redirect("/rooms");
+  }
+});
+
+app.post("/room/:roomCode/add", async (req, res) => {
+  try {
+    if (!dbConnected) {
+      return res.redirect("/rooms");
+    }
+    const user = await getOrCreateUser(req.session.id);
+    if (!user) return res.redirect("/rooms");
+
+    const { roomCode } = req.params;
+    const roomResult = await pool.query(
+      "SELECT * FROM rooms WHERE room_code = $1 AND is_active = true",
+      [roomCode.toUpperCase()]
+    );
+    if (roomResult.rows.length === 0) {
+      req.session.error = "Room not found.";
+      return res.redirect("/rooms");
+    }
+    const room = roomResult.rows[0];
+
+    // Ensure user is in this room
+    if (user.room_id !== room.id) {
+      await pool.query("UPDATE users SET room_id = $1 WHERE id = $2", [room.id, user.id]);
+    }
+
+    if (user.user_type !== 'observer') {
+      await pool.query(
+        "INSERT INTO beer_entries (user_id) VALUES ($1)",
+        [user.id]
+      );
+    }
+
+    res.redirect(`/room/${room.room_code}`);
+  } catch (error) {
+    console.error("Error in POST /room/:roomCode/add:", error);
+    res.status(500).send("Server error");
+  }
+});
+
+app.post("/room/:roomCode/remove", async (req, res) => {
+  try {
+    if (!dbConnected) {
+      return res.redirect("/rooms");
+    }
+    const user = await getOrCreateUser(req.session.id);
+    if (!user) return res.redirect("/rooms");
+
+    const { roomCode } = req.params;
+    const roomResult = await pool.query(
+      "SELECT * FROM rooms WHERE room_code = $1 AND is_active = true",
+      [roomCode.toUpperCase()]
+    );
+    if (roomResult.rows.length === 0) {
+      req.session.error = "Room not found.";
+      return res.redirect("/rooms");
+    }
+    const room = roomResult.rows[0];
+
+    // Ensure user is in this room
+    if (user.room_id !== room.id) {
+      await pool.query("UPDATE users SET room_id = $1 WHERE id = $2", [room.id, user.id]);
+    }
+
+    if (user.user_type !== 'observer') {
+      await pool.query(
+        "DELETE FROM beer_entries WHERE id = (SELECT id FROM beer_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1)",
+        [user.id]
+      );
+    }
+
+    res.redirect(`/room/${room.room_code}`);
+  } catch (error) {
+    console.error("Error in POST /room/:roomCode/remove:", error);
+    res.status(500).send("Server error");
   }
 });
 
